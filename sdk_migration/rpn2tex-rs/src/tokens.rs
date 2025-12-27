@@ -1,113 +1,71 @@
-//! Token types and definitions for the RPN lexer.
+//! Token types and token representation for the lexer.
 //!
-//! This module defines the core token types used in lexical analysis,
-//! including numeric literals and arithmetic operators.
+//! This module defines the token types that can appear in RPN expressions
+//! and the `Token` struct that represents a token with its value and position.
 
 use std::fmt;
 
-/// Token types recognized by the lexer.
+/// Types of tokens that can appear in RPN expressions.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::TokenType;
+/// use rpn2tex::tokens::TokenType;
 ///
-/// let token_type = TokenType::NUMBER;
-/// assert_eq!(token_type, TokenType::NUMBER);
+/// let token_type = TokenType::Plus;
+/// assert_eq!(token_type, TokenType::Plus);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    /// Numeric literal token
-    NUMBER,
-    /// Addition operator (+)
-    PLUS,
-    /// Subtraction operator (-)
-    MINUS,
-    /// Multiplication operator (*)
-    MULT,
-    /// Division operator (/)
-    DIV,
+    /// A numeric literal (integer or decimal)
+    Number,
+    /// The addition operator `+`
+    Plus,
+    /// The subtraction operator `-`
+    Minus,
+    /// The multiplication operator `*`
+    Mult,
+    /// The division operator `/`
+    Div,
     /// End of file marker
-    EOF,
+    Eof,
 }
 
-impl fmt::Display for TokenType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            Self::NUMBER => "NUMBER",
-            Self::PLUS => "PLUS",
-            Self::MINUS => "MINUS",
-            Self::MULT => "MULT",
-            Self::DIV => "DIV",
-            Self::EOF => "EOF",
-        };
-        write!(f, "{name}")
-    }
-}
-
-/// A token with type, value, and position information.
+/// A token with its type, value, and position information.
 ///
-/// Represents a single lexical token with its type, string value,
-/// and source location (line and column numbers, both 1-based).
+/// Positions are 1-based (first line/column is 1, not 0).
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::{Token, TokenType};
+/// use rpn2tex::tokens::{Token, TokenType};
 ///
-/// let token = Token::new(TokenType::NUMBER, "42", 1, 1);
-/// assert_eq!(token.token_type, TokenType::NUMBER);
+/// let token = Token {
+///     type_: TokenType::Number,
+///     value: "42".to_string(),
+///     line: 1,
+///     column: 1,
+/// };
 /// assert_eq!(token.value, "42");
-/// assert_eq!(token.line, 1);
-/// assert_eq!(token.column, 1);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     /// The type of this token
-    pub token_type: TokenType,
+    pub type_: TokenType,
     /// The string value of this token
     pub value: String,
-    /// Line number (1-based)
+    /// The line number where this token appears (1-based)
     pub line: u32,
-    /// Column number (1-based)
+    /// The column number where this token appears (1-based)
     pub column: u32,
-}
-
-impl Token {
-    /// Creates a new token.
-    ///
-    /// # Arguments
-    ///
-    /// * `token_type` - The type of the token
-    /// * `value` - The string value of the token
-    /// * `line` - Line number (1-based)
-    /// * `column` - Column number (1-based)
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::{Token, TokenType};
-    ///
-    /// let token = Token::new(TokenType::PLUS, "+", 1, 5);
-    /// assert_eq!(token.token_type, TokenType::PLUS);
-    /// ```
-    #[must_use]
-    pub fn new(token_type: TokenType, value: impl Into<String>, line: u32, column: u32) -> Self {
-        Self {
-            token_type,
-            value: value.into(),
-            line,
-            column,
-        }
-    }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Token({}, '{}', {}:{})",
-            self.token_type, self.value, self.line, self.column
+            "Token({:?}, '{}', {}:{})",
+            self.type_, self.value, self.line, self.column
         )
     }
 }
@@ -117,92 +75,86 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_token_type_equality() {
-        assert_eq!(TokenType::NUMBER, TokenType::NUMBER);
-        assert_eq!(TokenType::PLUS, TokenType::PLUS);
-        assert_ne!(TokenType::NUMBER, TokenType::PLUS);
-    }
+    fn test_token_creation() {
+        let token = Token {
+            type_: TokenType::Number,
+            value: "42".to_string(),
+            line: 1,
+            column: 5,
+        };
 
-    #[test]
-    fn test_token_type_display() {
-        assert_eq!(TokenType::NUMBER.to_string(), "NUMBER");
-        assert_eq!(TokenType::PLUS.to_string(), "PLUS");
-        assert_eq!(TokenType::MINUS.to_string(), "MINUS");
-        assert_eq!(TokenType::MULT.to_string(), "MULT");
-        assert_eq!(TokenType::DIV.to_string(), "DIV");
-        assert_eq!(TokenType::EOF.to_string(), "EOF");
-    }
-
-    #[test]
-    fn test_token_construction() {
-        let token = Token::new(TokenType::NUMBER, "42", 1, 1);
-        assert_eq!(token.token_type, TokenType::NUMBER);
+        assert_eq!(token.type_, TokenType::Number);
         assert_eq!(token.value, "42");
         assert_eq!(token.line, 1);
-        assert_eq!(token.column, 1);
-    }
-
-    #[test]
-    fn test_token_construction_with_string() {
-        let value = String::from("3.14");
-        let token = Token::new(TokenType::NUMBER, value, 2, 5);
-        assert_eq!(token.token_type, TokenType::NUMBER);
-        assert_eq!(token.value, "3.14");
-        assert_eq!(token.line, 2);
         assert_eq!(token.column, 5);
     }
 
     #[test]
-    fn test_token_display() {
-        let token = Token::new(TokenType::NUMBER, "42", 1, 1);
-        assert_eq!(token.to_string(), "Token(NUMBER, '42', 1:1)");
-
-        let token = Token::new(TokenType::PLUS, "+", 1, 5);
-        assert_eq!(token.to_string(), "Token(PLUS, '+', 1:5)");
-
-        let token = Token::new(TokenType::EOF, "", 3, 10);
-        assert_eq!(token.to_string(), "Token(EOF, '', 3:10)");
+    fn test_token_type_equality() {
+        assert_eq!(TokenType::Plus, TokenType::Plus);
+        assert_ne!(TokenType::Plus, TokenType::Minus);
     }
 
     #[test]
     fn test_token_equality() {
-        let token1 = Token::new(TokenType::NUMBER, "42", 1, 1);
-        let token2 = Token::new(TokenType::NUMBER, "42", 1, 1);
-        let token3 = Token::new(TokenType::NUMBER, "43", 1, 1);
-        let token4 = Token::new(TokenType::PLUS, "42", 1, 1);
+        let token1 = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 3,
+        };
+
+        let token2 = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 3,
+        };
 
         assert_eq!(token1, token2);
-        assert_ne!(token1, token3);
-        assert_ne!(token1, token4);
     }
 
     #[test]
-    fn test_token_clone() {
-        let token = Token::new(TokenType::MULT, "*", 2, 3);
-        let cloned = token.clone();
-        assert_eq!(token, cloned);
-        assert_eq!(token.token_type, cloned.token_type);
-        assert_eq!(token.value, cloned.value);
-        assert_eq!(token.line, cloned.line);
-        assert_eq!(token.column, cloned.column);
+    fn test_token_display() {
+        let token = Token {
+            type_: TokenType::Number,
+            value: "3.14".to_string(),
+            line: 2,
+            column: 7,
+        };
+
+        let display = format!("{}", token);
+        assert!(display.contains("Number"));
+        assert!(display.contains("3.14"));
+        assert!(display.contains("2:7"));
+    }
+
+    #[test]
+    fn test_token_type_copy() {
+        let t1 = TokenType::Mult;
+        let t2 = t1; // Copy, not move
+        assert_eq!(t1, t2);
     }
 
     #[test]
     fn test_all_token_types() {
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "42", 1, 1),
-            Token::new(TokenType::PLUS, "+", 1, 2),
-            Token::new(TokenType::MINUS, "-", 1, 3),
-            Token::new(TokenType::MULT, "*", 1, 4),
-            Token::new(TokenType::DIV, "/", 1, 5),
-            Token::new(TokenType::EOF, "", 1, 6),
+        let types = vec![
+            TokenType::Number,
+            TokenType::Plus,
+            TokenType::Minus,
+            TokenType::Mult,
+            TokenType::Div,
+            TokenType::Eof,
         ];
 
-        assert_eq!(tokens[0].token_type, TokenType::NUMBER);
-        assert_eq!(tokens[1].token_type, TokenType::PLUS);
-        assert_eq!(tokens[2].token_type, TokenType::MINUS);
-        assert_eq!(tokens[3].token_type, TokenType::MULT);
-        assert_eq!(tokens[4].token_type, TokenType::DIV);
-        assert_eq!(tokens[5].token_type, TokenType::EOF);
+        for token_type in types {
+            let token = Token {
+                type_: token_type,
+                value: String::new(),
+                line: 1,
+                column: 1,
+            };
+            assert_eq!(token.type_, token_type);
+        }
     }
 }

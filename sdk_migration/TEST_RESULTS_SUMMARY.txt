@@ -1,0 +1,190 @@
+================================================================================
+PYTHON rpn2tex IMPLEMENTATION - TEST EXECUTION SUMMARY
+================================================================================
+
+Generated: 2025-12-27
+Total Test Cases: 21
+Execution Time: Single batch execution with sequential tests
+
+================================================================================
+RESULTS OVERVIEW
+================================================================================
+
+Total Tests:             21
+Successful:              18
+Failed (Unsupported):    3
+Success Rate:            85.7%
+
+================================================================================
+TEST RESULTS (DETAILED)
+================================================================================
+
+[SUCCESS] Test 1:  "5 3 +"
+Output: $5 + 3$
+
+[SUCCESS] Test 2:  "5 3 -"
+Output: $5 - 3$
+
+[SUCCESS] Test 3:  "4 7 *"
+Output: $4 \times 7$
+
+[SUCCESS] Test 4:  "10 2 /"
+Output: $10 \div 2$
+
+[FAILED] Test 5:   "2 3 ^"
+Error: Unexpected character '^'
+Reason: Power operator not supported (lexer only recognizes +, -, *, /)
+
+[SUCCESS] Test 6:  "5 3 + 2 *"
+Output: $( 5 + 3 ) \times 2$
+
+[SUCCESS] Test 7:  "5 3 * 2 +"
+Output: $5 \times 3 + 2$
+
+[SUCCESS] Test 8:  "10 2 / 5 *"
+Output: $10 \div 2 \times 5$
+
+[SUCCESS] Test 9:  "5 3 - 2 -"
+Output: $5 - 3 - 2$
+
+[SUCCESS] Test 10: "100 10 / 5 / 2 /"
+Output: $100 \div 10 \div 5 \div 2$
+
+[SUCCESS] Test 11: "1 2 + 3 + 4 +"
+Output: $1 + 2 + 3 + 4$
+
+[SUCCESS] Test 12: "2 3 4 * +"
+Output: $2 + 3 \times 4$
+
+[SUCCESS] Test 13: "2 3 + 4 *"
+Output: $( 2 + 3 ) \times 4$
+
+[SUCCESS] Test 14: "2 3 4 + *"
+Output: $2 \times ( 3 + 4 )$
+
+[SUCCESS] Test 15: "2 3 * 4 +"
+Output: $2 \times 3 + 4$
+
+[FAILED] Test 16:  "2 3 ^ 4 *"
+Error: Unexpected character '^'
+Reason: Power operator not supported
+
+[FAILED] Test 17:  "2 3 4 ^ ^"
+Error: Unexpected character '^'
+Reason: Power operator not supported
+
+[SUCCESS] Test 18: "3.14 2 *"
+Output: $3.14 \times 2$
+
+[SUCCESS] Test 19: "1.5 0.5 +"
+Output: $1.5 + 0.5$
+
+[SUCCESS] Test 20: "1 2 + 3 4 + *"
+Output: $( 1 + 2 ) \times ( 3 + 4 )$
+
+[SUCCESS] Test 21: "10 2 / 3 + 4 *"
+Output: $( 10 \div 2 + 3 ) \times 4$
+
+================================================================================
+KEY OBSERVATIONS
+================================================================================
+
+1. SUPPORTED OPERATORS
+   - Addition (+)      -> Output: +
+   - Subtraction (-)   -> Output: -
+   - Multiplication (*) -> Output: \times
+   - Division (/)      -> Output: \div
+
+2. OPERATOR PRECEDENCE
+   - Multiplication and Division have higher precedence than Addition and Subtraction
+   - This means:
+     * 5 3 * 2 + = 5 * 3 + 2 = 15 + 2 = output: $5 \times 3 + 2$ (no parens)
+     * 5 3 + 2 * = (5 + 3) * 2 = 8 * 2 = output: $( 5 + 3 ) \times 2$ (parens added)
+
+3. PARENTHESIZATION LOGIC
+   - Parentheses are added around lower-precedence operations when they appear as
+     operands to higher-precedence operations
+   - Both left and right operands are parenthesized when needed
+   - Example: "1 2 + 3 4 + *" = (1 + 2) * (3 + 4) = output with parens on both sides
+
+4. ASSOCIATIVITY
+   - Left-to-right associativity is observed:
+     * 5 3 - 2 - = (5 - 3) - 2 = output: $5 - 3 - 2$
+     * 100 10 / 5 / 2 / = ((100 / 10) / 5) / 2 = output with no inner parens
+
+5. NUMBER HANDLING
+   - Integers: 5, 100, 10 (preserved as-is)
+   - Floats: 3.14, 1.5, 0.5 (decimal representation preserved exactly)
+   - No scientific notation observed in outputs
+   - No number formatting or rounding applied
+
+6. OUTPUT FORMAT
+   - All outputs are wrapped in $ ... $ (LaTeX inline math mode)
+   - Spaces are added around binary operators for readability
+   - Simple ASCII parentheses: ( and )
+   - No special LaTeX grouping or environment directives
+
+================================================================================
+UNSUPPORTED FEATURES
+================================================================================
+
+1. Power/Exponentiation (^)
+   - Lexer raises: "Error: Unexpected character '^'"
+   - This is a fundamental limitation of the current lexer implementation
+   - No support for xor, superscript, or any caret-based operation
+
+2. Other potential issues (not tested):
+   - No error handling for stack underflow (too few operands)
+   - No error handling for stack overflow (too many operands)
+   - No support for other mathematical operators
+   - No support for functions (sin, cos, log, etc.)
+
+================================================================================
+VALIDATION NOTES FOR RUST MIGRATION
+================================================================================
+
+The Rust implementation must:
+
+1. EXACT OUTPUT MATCHING
+   - Produce identical LaTeX strings for all 18 successful test cases
+   - Including exact spacing and parenthesis placement
+   - Including LaTeX symbols (\times, \div)
+
+2. OPERATOR SYMBOLS
+   - Use \times for multiplication (not \cdot or *)
+   - Use \div for division (not / or \frac)
+
+3. FLOATING POINT PRECISION
+   - Handle 3.14, 1.5, 0.5 correctly
+   - Preserve decimal representation (no rounding/truncation)
+
+4. PRECEDENCE AND ASSOCIATIVITY
+   - Implement standard math precedence (multiplication/division > addition/subtraction)
+   - Implement left-to-right associativity for same-precedence operators
+   - Add parentheses according to the observed rules
+
+5. PARENTHESIZATION RULES
+   - Add parentheses when a lower-precedence operation is an operand to higher-precedence
+   - Add parentheses to both operands when both need them
+   - Format: simple ASCII parentheses with spaces: ( and )
+
+6. ERROR HANDLING
+   - For caret (^) operator: produce appropriate error message
+   - Error message format should follow: "Error: Unexpected character '^'"
+   - Include position information (line and column) in error output
+
+================================================================================
+TEST EXECUTION ENVIRONMENT
+================================================================================
+
+Platform: macOS Darwin 24.6.0
+Python Version: 3.x (via /opt/miniconda3/bin/python3)
+Package: rpn2tex 0.1.0 (installed from /Users/jfreeman/Coding/rpn2tex)
+Installation Method: pip install -e (editable mode)
+Execution Method: rpn2tex command (installed script entry point)
+
+All tests executed with: echo "INPUT" | rpn2tex -
+
+================================================================================
+END OF SUMMARY
+================================================================================

@@ -1,70 +1,48 @@
-//! RPN expression parser.
+//! Parsing token streams into Abstract Syntax Trees using stack-based RPN algorithm.
 //!
-//! This module provides a parser for Reverse Polish Notation (RPN) expressions,
-//! converting a token stream into an Abstract Syntax Tree (AST).
+//! This module provides the `Parser` struct for converting token streams
+//! into expression trees. It implements a stack-based RPN parser that
+//! validates operand counts and produces well-formed ASTs.
 
-use crate::ast::{BinaryOp, Expr, Number};
+use crate::ast::Expr;
 use crate::tokens::{Token, TokenType};
 use std::fmt;
 
 /// Error that occurs during parsing.
 ///
-/// Contains the error message and the token where the error occurred,
-/// allowing for detailed error reporting with position information.
+/// Contains the error message and the token where the error occurred.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::{Parser, Token, TokenType};
+/// use rpn2tex::parser::ParserError;
+/// use rpn2tex::tokens::{Token, TokenType};
 ///
-/// let tokens = vec![
-///     Token::new(TokenType::PLUS, "+", 1, 1),
-///     Token::new(TokenType::EOF, "", 1, 2),
-/// ];
-/// let mut parser = Parser::new(tokens);
-/// let result = parser.parse();
-/// assert!(result.is_err());
+/// let token = Token {
+///     type_: TokenType::Plus,
+///     value: "+".to_string(),
+///     line: 1,
+///     column: 5,
+/// };
+/// let error = ParserError {
+///     message: "Not enough operands".to_string(),
+///     token,
+/// };
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParserError {
-    /// Error message describing what went wrong
+    /// The error message
     pub message: String,
-    /// Token where the error occurred
+    /// The token where the error occurred
     pub token: Token,
-}
-
-impl ParserError {
-    /// Creates a new parser error.
-    ///
-    /// # Arguments
-    ///
-    /// * `message` - The error message
-    /// * `token` - The token where the error occurred
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::{ParserError, Token, TokenType};
-    ///
-    /// let token = Token::new(TokenType::PLUS, "+", 1, 1);
-    /// let error = ParserError::new("Insufficient operands", token);
-    /// assert_eq!(error.message, "Insufficient operands");
-    /// ```
-    #[must_use]
-    pub fn new(message: impl Into<String>, token: Token) -> Self {
-        Self {
-            message: message.into(),
-            token,
-        }
-    }
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} at line {}, column {}",
-            self.message, self.token.line, self.token.column
+            "ParserError at line {}, column {}: {}",
+            self.token.line, self.token.column, self.message
         )
     }
 }
@@ -73,48 +51,45 @@ impl std::error::Error for ParserError {}
 
 /// Parser for RPN expressions.
 ///
-/// Converts a stream of tokens into an Abstract Syntax Tree (AST) using
-/// a stack-based algorithm. Numbers are pushed onto the stack, and operators
-/// pop two operands to create binary operation nodes.
+/// Implements a stack-based RPN parsing algorithm:
+/// - Numbers are pushed onto the stack
+/// - Operators pop two operands, create a binary operation node, and push the result
+/// - At the end, the stack must contain exactly one expression
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::{Parser, Token, TokenType, Expr, Number};
+/// use rpn2tex::lexer::Lexer;
+/// use rpn2tex::parser::Parser;
+/// use rpn2tex::ast::Expr;
 ///
-/// // Parse "3 4 +"
-/// let tokens = vec![
-///     Token::new(TokenType::NUMBER, "3", 1, 1),
-///     Token::new(TokenType::NUMBER, "4", 1, 3),
-///     Token::new(TokenType::PLUS, "+", 1, 5),
-///     Token::new(TokenType::EOF, "", 1, 6),
-/// ];
-/// let mut parser = Parser::new(tokens);
-/// let result = parser.parse();
-/// assert!(result.is_ok());
+/// let lexer = Lexer::new("5 3 +");
+/// let tokens = lexer.tokenize().unwrap();
+/// let parser = Parser::new(tokens);
+/// let ast = parser.parse().unwrap();
+///
+/// // Should produce: BinaryOp("+", Number("5"), Number("3"))
+/// match ast {
+///     Expr::BinaryOp { operator, .. } => assert_eq!(operator, "+"),
+///     _ => panic!("Expected BinaryOp"),
+/// }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
 }
 
 impl Parser {
-    /// Creates a new parser with the given token stream.
-    ///
-    /// # Arguments
-    ///
-    /// * `tokens` - Vector of tokens to parse
+    /// Creates a new parser for the given token stream.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::{Parser, Token, TokenType};
+    /// use rpn2tex::lexer::Lexer;
+    /// use rpn2tex::parser::Parser;
     ///
-    /// let tokens = vec![
-    ///     Token::new(TokenType::NUMBER, "42", 1, 1),
-    ///     Token::new(TokenType::EOF, "", 1, 3),
-    /// ];
+    /// let lexer = Lexer::new("5 3 +");
+    /// let tokens = lexer.tokenize().unwrap();
     /// let parser = Parser::new(tokens);
     /// ```
     #[must_use]
@@ -122,131 +97,137 @@ impl Parser {
         Self { tokens, pos: 0 }
     }
 
-    /// Parses the token stream into an AST.
+    /// Parses the token stream into an Abstract Syntax Tree.
     ///
-    /// Uses a stack-based algorithm to parse RPN expressions:
-    /// - Numbers are pushed onto the stack
-    /// - Operators pop two operands and create a binary operation node
-    /// - The final stack must contain exactly one expression
-    ///
-    /// # Returns
-    ///
-    /// * `Ok(Expr)` - The root AST node if parsing succeeds
-    /// * `Err(ParserError)` - Error with position information if parsing fails
+    /// Uses a stack-based algorithm to process RPN expressions:
+    /// 1. Numbers are pushed onto the stack as expression nodes
+    /// 2. Operators pop two operands, create a `BinaryOp` node, and push it
+    /// 3. After processing all tokens, exactly one expression should remain
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - An operator has insufficient operands
-    /// - An unexpected token type is encountered
+    /// Returns a `ParserError` if:
     /// - The expression is empty
-    /// - Multiple values remain on the stack (missing operators)
+    /// - An operator doesn't have enough operands (stack has < 2 elements)
+    /// - Too many operands remain (stack has > 1 element at the end)
+    /// - An unexpected token type is encountered
+    ///
+    /// # Panics
+    ///
+    /// This function does not panic. All `unwrap()` calls are protected by
+    /// length checks that ensure the stack has the required elements.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::{Parser, Token, TokenType};
+    /// use rpn2tex::lexer::Lexer;
+    /// use rpn2tex::parser::Parser;
     ///
-    /// let tokens = vec![
-    ///     Token::new(TokenType::NUMBER, "3", 1, 1),
-    ///     Token::new(TokenType::NUMBER, "4", 1, 3),
-    ///     Token::new(TokenType::PLUS, "+", 1, 5),
-    ///     Token::new(TokenType::EOF, "", 1, 6),
-    /// ];
-    /// let mut parser = Parser::new(tokens);
-    /// let ast = parser.parse().unwrap();
+    /// // Valid expression
+    /// let lexer = Lexer::new("5 3 +");
+    /// let tokens = lexer.tokenize().unwrap();
+    /// let parser = Parser::new(tokens);
+    /// let result = parser.parse();
+    /// assert!(result.is_ok());
+    ///
+    /// // Invalid: not enough operands
+    /// let lexer = Lexer::new("5 +");
+    /// let tokens = lexer.tokenize().unwrap();
+    /// let parser = Parser::new(tokens);
+    /// let result = parser.parse();
+    /// assert!(result.is_err());
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Does not panic under normal usage.
-    pub fn parse(&mut self) -> Result<Expr, ParserError> {
+    pub fn parse(mut self) -> Result<Expr, ParserError> {
         let mut stack: Vec<Expr> = Vec::new();
 
         while !self.at_end() {
-            let token = self.current().clone();
+            let token = self.current();
 
-            match token.token_type {
-                TokenType::NUMBER => {
-                    let node = Expr::Number(Number::new(&token.value, token.line, token.column));
+            match token.type_ {
+                TokenType::Number => {
+                    // Create a Number node and push it onto the stack
+                    let node = Expr::Number {
+                        line: token.line,
+                        column: token.column,
+                        value: token.value.clone(),
+                    };
                     stack.push(node);
                     self.advance();
                 }
-                TokenType::PLUS | TokenType::MINUS | TokenType::MULT | TokenType::DIV => {
+                TokenType::Plus | TokenType::Minus | TokenType::Mult | TokenType::Div => {
+                    // Check that we have at least 2 operands on the stack
                     if stack.len() < 2 {
-                        return Err(ParserError::new(
-                            format!("Operator '{}' requires two operands", token.value),
-                            token,
-                        ));
+                        return Err(ParserError {
+                            message: format!("Not enough operands for operator '{}'", token.value),
+                            token: token.clone(),
+                        });
                     }
 
-                    // Pop right first, then left (stack order)
+                    // Pop right operand first (stack is LIFO)
                     let right = stack.pop().unwrap();
                     let left = stack.pop().unwrap();
 
-                    // Map token type to operator string
-                    let operator = match token.token_type {
-                        TokenType::PLUS => "+",
-                        TokenType::MINUS => "-",
-                        TokenType::MULT => "*",
-                        TokenType::DIV => "/",
-                        _ => unreachable!(),
+                    // Create a BinaryOp node
+                    let node = Expr::BinaryOp {
+                        line: token.line,
+                        column: token.column,
+                        operator: token.value.clone(),
+                        left: Box::new(left),
+                        right: Box::new(right),
                     };
-
-                    let node = Expr::BinaryOp(BinaryOp::new(
-                        operator,
-                        left,
-                        right,
-                        token.line,
-                        token.column,
-                    ));
                     stack.push(node);
                     self.advance();
                 }
-                TokenType::EOF => {
+                TokenType::Eof => {
                     break;
                 }
             }
         }
 
-        // Validate final state
+        // Validate final stack state
         match stack.len() {
             0 => {
-                let last_token = if self.pos > 0 && self.pos <= self.tokens.len() {
-                    self.tokens[self.pos - 1].clone()
-                } else {
-                    Token::new(TokenType::EOF, "", 1, 1)
+                // Get the EOF token for error reporting
+                let default_token = Token {
+                    type_: TokenType::Eof,
+                    value: String::new(),
+                    line: 1,
+                    column: 1,
                 };
-                Err(ParserError::new("Empty expression", last_token))
+                let eof_token = self.tokens.last().unwrap_or(&default_token);
+                Err(ParserError {
+                    message: "Empty expression".to_string(),
+                    token: eof_token.clone(),
+                })
             }
             1 => Ok(stack.pop().unwrap()),
             n => {
-                let last_token = if self.pos > 0 && self.pos <= self.tokens.len() {
-                    self.tokens[self.pos - 1].clone()
-                } else {
-                    Token::new(TokenType::EOF, "", 1, 1)
+                // Get the EOF token for error reporting
+                let default_token = Token {
+                    type_: TokenType::Eof,
+                    value: String::new(),
+                    line: 1,
+                    column: 1,
                 };
-                Err(ParserError::new(
-                    format!("Invalid RPN: {n} values remain on stack (missing operators?)"),
-                    last_token,
-                ))
+                let eof_token = self.tokens.last().unwrap_or(&default_token);
+                Err(ParserError {
+                    message: format!("{n} values remain on stack"),
+                    token: eof_token.clone(),
+                })
             }
         }
     }
 
-    /// Returns a reference to the current token.
-    ///
-    /// # Panics
-    ///
-    /// Panics if position is beyond the token stream (should not happen in normal usage).
-    fn current(&self) -> &Token {
-        &self.tokens[self.pos]
-    }
-
-    /// Checks if the current token is EOF.
+    /// Checks if we've reached the end of the token stream.
     #[must_use]
     fn at_end(&self) -> bool {
-        self.pos >= self.tokens.len() || self.current().token_type == TokenType::EOF
+        self.pos >= self.tokens.len() || matches!(self.tokens[self.pos].type_, TokenType::Eof)
+    }
+
+    /// Returns the current token without advancing.
+    #[must_use]
+    fn current(&self) -> &Token {
+        &self.tokens[self.pos]
     }
 
     /// Advances to the next token.
@@ -260,245 +241,144 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lexer::Lexer;
 
     #[test]
-    fn test_parser_error_new() {
-        let token = Token::new(TokenType::PLUS, "+", 1, 5);
-        let error = ParserError::new("Test error", token.clone());
-        assert_eq!(error.message, "Test error");
-        assert_eq!(error.token, token);
-    }
+    fn test_single_number() {
+        let lexer = Lexer::new("5");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse().unwrap();
 
-    #[test]
-    fn test_parser_error_display() {
-        let token = Token::new(TokenType::PLUS, "+", 2, 10);
-        let error = ParserError::new("Insufficient operands", token);
-        assert_eq!(
-            error.to_string(),
-            "Insufficient operands at line 2, column 10"
-        );
-    }
-
-    #[test]
-    fn test_parser_new() {
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "42", 1, 1),
-            Token::new(TokenType::EOF, "", 1, 3),
-        ];
-        let parser = Parser::new(tokens.clone());
-        assert_eq!(parser.tokens, tokens);
-        assert_eq!(parser.pos, 0);
-    }
-
-    #[test]
-    fn test_parse_single_number() {
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "42", 1, 1),
-            Token::new(TokenType::EOF, "", 1, 3),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::Number(n) => {
-                assert_eq!(n.value, "42");
-                assert_eq!(n.line, 1);
-                assert_eq!(n.column, 1);
-            }
-            _ => panic!("Expected Number"),
+        match result {
+            Expr::Number { value, .. } => assert_eq!(value, "5"),
+            _ => panic!("Expected Number node"),
         }
     }
 
     #[test]
-    fn test_parse_simple_addition() {
-        // "3 4 +"
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "3", 1, 1),
-            Token::new(TokenType::NUMBER, "4", 1, 3),
-            Token::new(TokenType::PLUS, "+", 1, 5),
-            Token::new(TokenType::EOF, "", 1, 6),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+    fn test_simple_addition() {
+        let lexer = Lexer::new("5 3 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse().unwrap();
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.operator, "+");
-                assert_eq!(binop.line, 1);
-                assert_eq!(binop.column, 5);
-
-                // Check left operand
-                match binop.left.as_ref() {
-                    Expr::Number(n) => assert_eq!(n.value, "3"),
-                    _ => panic!("Expected Number in left"),
+        match result {
+            Expr::BinaryOp {
+                operator,
+                left,
+                right,
+                ..
+            } => {
+                assert_eq!(operator, "+");
+                match *left {
+                    Expr::Number { ref value, .. } => assert_eq!(value, "5"),
+                    _ => panic!("Expected Number for left operand"),
                 }
-
-                // Check right operand
-                match binop.right.as_ref() {
-                    Expr::Number(n) => assert_eq!(n.value, "4"),
-                    _ => panic!("Expected Number in right"),
+                match *right {
+                    Expr::Number { ref value, .. } => assert_eq!(value, "3"),
+                    _ => panic!("Expected Number for right operand"),
                 }
             }
-            _ => panic!("Expected BinaryOp"),
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_parse_subtraction() {
-        // "10 5 -"
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "10", 1, 1),
-            Token::new(TokenType::NUMBER, "5", 1, 4),
-            Token::new(TokenType::MINUS, "-", 1, 6),
-            Token::new(TokenType::EOF, "", 1, 7),
+    fn test_all_operators() {
+        let test_cases = vec![
+            ("5 3 +", "+"),
+            ("5 3 -", "-"),
+            ("4 7 *", "*"),
+            ("10 2 /", "/"),
         ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.operator, "-");
+        for (input, expected_op) in test_cases {
+            let lexer = Lexer::new(input);
+            let tokens = lexer.tokenize().unwrap();
+            let parser = Parser::new(tokens);
+            let result = parser.parse().unwrap();
+
+            match result {
+                Expr::BinaryOp { operator, .. } => assert_eq!(operator, expected_op),
+                _ => panic!("Expected BinaryOp for input: {input}"),
             }
-            _ => panic!("Expected BinaryOp"),
         }
     }
 
     #[test]
-    fn test_parse_multiplication() {
-        // "6 7 *"
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "6", 1, 1),
-            Token::new(TokenType::NUMBER, "7", 1, 3),
-            Token::new(TokenType::MULT, "*", 1, 5),
-            Token::new(TokenType::EOF, "", 1, 6),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+    fn test_complex_expression() {
+        // "5 3 + 2 *" should parse to: BinaryOp("*", BinaryOp("+", 5, 3), 2)
+        let lexer = Lexer::new("5 3 + 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse().unwrap();
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.operator, "*");
-            }
-            _ => panic!("Expected BinaryOp"),
-        }
-    }
-
-    #[test]
-    fn test_parse_division() {
-        // "8 2 /"
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "8", 1, 1),
-            Token::new(TokenType::NUMBER, "2", 1, 3),
-            Token::new(TokenType::DIV, "/", 1, 5),
-            Token::new(TokenType::EOF, "", 1, 6),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.operator, "/");
-            }
-            _ => panic!("Expected BinaryOp"),
-        }
-    }
-
-    #[test]
-    fn test_parse_nested_expression() {
-        // "3 4 + 5 *" = (3 + 4) * 5
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "3", 1, 1),
-            Token::new(TokenType::NUMBER, "4", 1, 3),
-            Token::new(TokenType::PLUS, "+", 1, 5),
-            Token::new(TokenType::NUMBER, "5", 1, 7),
-            Token::new(TokenType::MULT, "*", 1, 9),
-            Token::new(TokenType::EOF, "", 1, 10),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(mult_op) => {
-                assert_eq!(mult_op.operator, "*");
-
-                // Left should be (3 + 4)
-                match mult_op.left.as_ref() {
-                    Expr::BinaryOp(add_op) => {
-                        assert_eq!(add_op.operator, "+");
-                        match add_op.left.as_ref() {
-                            Expr::Number(n) => assert_eq!(n.value, "3"),
-                            _ => panic!("Expected Number"),
-                        }
-                        match add_op.right.as_ref() {
-                            Expr::Number(n) => assert_eq!(n.value, "4"),
-                            _ => panic!("Expected Number"),
-                        }
-                    }
-                    _ => panic!("Expected BinaryOp in left"),
+        match result {
+            Expr::BinaryOp {
+                operator,
+                left,
+                right,
+                ..
+            } => {
+                assert_eq!(operator, "*");
+                // Left should be a BinaryOp
+                match *left {
+                    Expr::BinaryOp {
+                        operator: ref left_op,
+                        ..
+                    } => assert_eq!(left_op, "+"),
+                    _ => panic!("Expected BinaryOp for left operand"),
                 }
-
-                // Right should be 5
-                match mult_op.right.as_ref() {
-                    Expr::Number(n) => assert_eq!(n.value, "5"),
-                    _ => panic!("Expected Number"),
+                // Right should be a Number
+                match *right {
+                    Expr::Number { ref value, .. } => assert_eq!(value, "2"),
+                    _ => panic!("Expected Number for right operand"),
                 }
             }
-            _ => panic!("Expected BinaryOp"),
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_parse_complex_nested() {
-        // "1 2 + 3 4 + *" = (1 + 2) * (3 + 4)
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "1", 1, 1),
-            Token::new(TokenType::NUMBER, "2", 1, 3),
-            Token::new(TokenType::PLUS, "+", 1, 5),
-            Token::new(TokenType::NUMBER, "3", 1, 7),
-            Token::new(TokenType::NUMBER, "4", 1, 9),
-            Token::new(TokenType::PLUS, "+", 1, 11),
-            Token::new(TokenType::MULT, "*", 1, 13),
-            Token::new(TokenType::EOF, "", 1, 14),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+    fn test_nested_expression() {
+        // "2 3 4 * +" should parse to: BinaryOp("+", 2, BinaryOp("*", 3, 4))
+        let lexer = Lexer::new("2 3 4 * +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse().unwrap();
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(mult_op) => {
-                assert_eq!(mult_op.operator, "*");
-
-                // Both left and right should be BinaryOps
-                match mult_op.left.as_ref() {
-                    Expr::BinaryOp(add_op) => assert_eq!(add_op.operator, "+"),
-                    _ => panic!("Expected BinaryOp"),
+        match result {
+            Expr::BinaryOp {
+                operator,
+                left,
+                right,
+                ..
+            } => {
+                assert_eq!(operator, "+");
+                // Left should be a Number
+                match *left {
+                    Expr::Number { ref value, .. } => assert_eq!(value, "2"),
+                    _ => panic!("Expected Number for left operand"),
                 }
-                match mult_op.right.as_ref() {
-                    Expr::BinaryOp(add_op) => assert_eq!(add_op.operator, "+"),
-                    _ => panic!("Expected BinaryOp"),
+                // Right should be a BinaryOp
+                match *right {
+                    Expr::BinaryOp {
+                        operator: ref right_op,
+                        ..
+                    } => assert_eq!(right_op, "*"),
+                    _ => panic!("Expected BinaryOp for right operand"),
                 }
             }
-            _ => panic!("Expected BinaryOp"),
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_parse_empty_expression() {
-        let tokens = vec![Token::new(TokenType::EOF, "", 1, 1)];
-        let mut parser = Parser::new(tokens);
+    fn test_error_empty_expression() {
+        let lexer = Lexer::new("");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
         let result = parser.parse();
 
         assert!(result.is_err());
@@ -507,184 +387,192 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_missing_operands() {
-        // Just "+" without operands
-        let tokens = vec![
-            Token::new(TokenType::PLUS, "+", 1, 1),
-            Token::new(TokenType::EOF, "", 1, 2),
-        ];
-        let mut parser = Parser::new(tokens);
+    fn test_error_not_enough_operands() {
+        let lexer = Lexer::new("5 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
         let result = parser.parse();
 
         assert!(result.is_err());
         let error = result.unwrap_err();
-        assert!(error.message.contains("requires two operands"));
-        assert_eq!(error.token.token_type, TokenType::PLUS);
+        assert!(error.message.contains("Not enough operands"));
     }
 
     #[test]
-    fn test_parse_insufficient_operands() {
-        // "3 +" - only one operand
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "3", 1, 1),
-            Token::new(TokenType::PLUS, "+", 1, 3),
-            Token::new(TokenType::EOF, "", 1, 4),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert!(error.message.contains("requires two operands"));
-    }
-
-    #[test]
-    fn test_parse_extra_operands() {
-        // "3 4 5 +" - leaves 3 on stack
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "3", 1, 1),
-            Token::new(TokenType::NUMBER, "4", 1, 3),
-            Token::new(TokenType::NUMBER, "5", 1, 5),
-            Token::new(TokenType::PLUS, "+", 1, 7),
-            Token::new(TokenType::EOF, "", 1, 8),
-        ];
-        let mut parser = Parser::new(tokens);
+    fn test_error_too_many_operands() {
+        let lexer = Lexer::new("5 3");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
         let result = parser.parse();
 
         assert!(result.is_err());
         let error = result.unwrap_err();
         assert!(error.message.contains("2 values remain on stack"));
-        assert!(error.message.contains("missing operators"));
     }
 
     #[test]
-    fn test_parse_all_operators() {
-        let operators = vec![
-            (TokenType::PLUS, "+"),
-            (TokenType::MINUS, "-"),
-            (TokenType::MULT, "*"),
-            (TokenType::DIV, "/"),
-        ];
-
-        for (token_type, op_str) in operators {
-            let tokens = vec![
-                Token::new(TokenType::NUMBER, "1", 1, 1),
-                Token::new(TokenType::NUMBER, "2", 1, 3),
-                Token::new(token_type, op_str, 1, 5),
-                Token::new(TokenType::EOF, "", 1, 6),
-            ];
-            let mut parser = Parser::new(tokens);
-            let result = parser.parse();
-
-            assert!(result.is_ok());
-            match result.unwrap() {
-                Expr::BinaryOp(binop) => assert_eq!(binop.operator, op_str),
-                _ => panic!("Expected BinaryOp"),
-            }
-        }
+    fn test_error_display() {
+        let token = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 5,
+        };
+        let error = ParserError {
+            message: "Test error".to_string(),
+            token,
+        };
+        let display = format!("{error}");
+        assert!(display.contains("line 1"));
+        assert!(display.contains("column 5"));
+        assert!(display.contains("Test error"));
     }
 
     #[test]
-    fn test_parse_position_tracking() {
-        // Verify that position information is preserved
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "3", 2, 5),
-            Token::new(TokenType::NUMBER, "4", 2, 7),
-            Token::new(TokenType::PLUS, "+", 2, 9),
-            Token::new(TokenType::EOF, "", 2, 10),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-        match expr {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.line, 2);
-                assert_eq!(binop.column, 9);
-
-                match binop.left.as_ref() {
-                    Expr::Number(n) => {
-                        assert_eq!(n.line, 2);
-                        assert_eq!(n.column, 5);
-                    }
-                    _ => panic!("Expected Number"),
-                }
-
-                match binop.right.as_ref() {
-                    Expr::Number(n) => {
-                        assert_eq!(n.line, 2);
-                        assert_eq!(n.column, 7);
-                    }
-                    _ => panic!("Expected Number"),
-                }
-            }
-            _ => panic!("Expected BinaryOp"),
-        }
-    }
-
-    #[test]
-    fn test_parse_rpn_evaluation_order() {
-        // "5 3 -" should be 5 - 3 (not 3 - 5)
-        // In the AST: left=5, right=3
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "5", 1, 1),
-            Token::new(TokenType::NUMBER, "3", 1, 3),
-            Token::new(TokenType::MINUS, "-", 1, 5),
-            Token::new(TokenType::EOF, "", 1, 6),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_ok());
-        match result.unwrap() {
-            Expr::BinaryOp(binop) => {
-                assert_eq!(binop.operator, "-");
-                match binop.left.as_ref() {
-                    Expr::Number(n) => assert_eq!(n.value, "5"),
-                    _ => panic!("Expected Number"),
-                }
-                match binop.right.as_ref() {
-                    Expr::Number(n) => assert_eq!(n.value, "3"),
-                    _ => panic!("Expected Number"),
-                }
-            }
-            _ => panic!("Expected BinaryOp"),
-        }
-    }
-
-    #[test]
-    fn test_parser_error_token_information() {
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "42", 3, 10),
-            Token::new(TokenType::PLUS, "+", 3, 13),
-            Token::new(TokenType::EOF, "", 3, 14),
-        ];
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_err());
-        let error = result.unwrap_err();
-        assert_eq!(error.token.line, 3);
-        assert_eq!(error.token.column, 13);
-        assert_eq!(error.token.token_type, TokenType::PLUS);
-    }
-
-    #[test]
-    fn test_parser_clone() {
-        let tokens = vec![
-            Token::new(TokenType::NUMBER, "42", 1, 1),
-            Token::new(TokenType::EOF, "", 1, 3),
-        ];
+    fn test_position_tracking() {
+        let lexer = Lexer::new("5 3 +");
+        let tokens = lexer.tokenize().unwrap();
         let parser = Parser::new(tokens);
-        let cloned = parser.clone();
-        assert_eq!(parser, cloned);
+        let result = parser.parse().unwrap();
+
+        // The operator should have position information from the token
+        match result {
+            Expr::BinaryOp {
+                line, column, left, ..
+            } => {
+                assert_eq!(line, 1);
+                assert_eq!(column, 5);
+                // Check left operand position
+                assert_eq!(left.line(), 1);
+                assert_eq!(left.column(), 1);
+            }
+            _ => panic!("Expected BinaryOp node"),
+        }
     }
 
     #[test]
-    fn test_parser_error_clone() {
-        let token = Token::new(TokenType::PLUS, "+", 1, 5);
-        let error = ParserError::new("Test", token);
+    fn test_decimal_numbers() {
+        let lexer = Lexer::new("3.14 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse().unwrap();
+
+        match result {
+            Expr::BinaryOp { left, .. } => match *left {
+                Expr::Number { ref value, .. } => assert_eq!(value, "3.14"),
+                _ => panic!("Expected Number for left operand"),
+            },
+            _ => panic!("Expected BinaryOp node"),
+        }
+    }
+
+    // I/O Contract validation tests
+
+    #[test]
+    fn test_io_contract_case_1() {
+        // "5 3 +" should parse to BinaryOp("+", Number("5"), Number("3"))
+        let lexer = Lexer::new("5 3 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+        assert!(result.is_ok());
+
+        let ast = result.unwrap();
+        match ast {
+            Expr::BinaryOp {
+                operator,
+                left,
+                right,
+                ..
+            } => {
+                assert_eq!(operator, "+");
+                assert!(matches!(*left, Expr::Number { .. }));
+                assert!(matches!(*right, Expr::Number { .. }));
+            }
+            _ => panic!("Expected BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_io_contract_case_6() {
+        // "5 3 + 2 *" should parse correctly
+        let lexer = Lexer::new("5 3 + 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_io_contract_case_7() {
+        // "5 3 * 2 +" should parse correctly
+        let lexer = Lexer::new("5 3 * 2 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_io_contract_long_chain() {
+        // "1 2 + 3 + 4 +" should parse correctly
+        let lexer = Lexer::new("1 2 + 3 + 4 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_io_contract_complex_case_20() {
+        // "1 2 + 3 4 + *" should parse correctly
+        let lexer = Lexer::new("1 2 + 3 4 + *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parser_error_equality() {
+        let token1 = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 5,
+        };
+        let token2 = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 5,
+        };
+
+        let error1 = ParserError {
+            message: "Test".to_string(),
+            token: token1,
+        };
+        let error2 = ParserError {
+            message: "Test".to_string(),
+            token: token2,
+        };
+
+        assert_eq!(error1, error2);
+    }
+
+    #[test]
+    fn test_clone() {
+        let token = Token {
+            type_: TokenType::Plus,
+            value: "+".to_string(),
+            line: 1,
+            column: 5,
+        };
+        let error = ParserError {
+            message: "Test".to_string(),
+            token,
+        };
+
         let cloned = error.clone();
         assert_eq!(error, cloned);
     }

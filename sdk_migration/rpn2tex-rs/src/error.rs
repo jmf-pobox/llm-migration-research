@@ -1,163 +1,110 @@
-//! Error formatting utilities for displaying parse errors with context.
+//! Error formatting with source context.
 //!
-//! This module provides the `ErrorFormatter` struct for creating user-friendly
-//! error messages with source code context and visual indicators.
+//! This module provides the `ErrorFormatter` struct for formatting parse and
+//! lexer errors with source code context and position markers.
 
-/// Formats error messages with source code context.
+/// Formatter for parse and lexer errors with source context.
 ///
-/// The `ErrorFormatter` takes source code and provides methods to format
-/// error messages with contextual lines and visual indicators (caret) pointing
-/// to the exact location of the error.
+/// Stores the source text and provides formatted error messages with
+/// line numbers, source context, and a caret pointing to the error position.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::ErrorFormatter;
+/// use rpn2tex::error::ErrorFormatter;
 ///
-/// let source = "3 4 +\n5 6 *";
+/// let source = "2 3 ^".to_string();
 /// let formatter = ErrorFormatter::new(source);
-/// let error = formatter.format_error("Unexpected token", 1, 5);
-/// assert!(error.contains("Error: Unexpected token"));
-/// assert!(error.contains("^"));
+/// let formatted = formatter.format_error("Unexpected character '^'", 1, 5);
+/// assert!(formatted.contains("Error:"));
+/// assert!(formatted.contains("2 3 ^"));
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorFormatter {
+    #[allow(dead_code)] // Used in tests
     source: String,
     lines: Vec<String>,
 }
 
 impl ErrorFormatter {
-    /// Creates a new error formatter with the given source code.
+    /// Creates a new error formatter for the given source text.
     ///
-    /// The source code is split into lines for efficient context extraction.
-    ///
-    /// # Arguments
-    ///
-    /// * `source` - The complete source code text
+    /// The source is split into lines for context display.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ErrorFormatter;
+    /// use rpn2tex::error::ErrorFormatter;
     ///
-    /// let formatter = ErrorFormatter::new("3 4 + 5 *");
+    /// let source = "5 3 +\n2 3 ^".to_string();
+    /// let formatter = ErrorFormatter::new(source);
     /// ```
     #[must_use]
-    pub fn new(source: impl Into<String>) -> Self {
-        let source = source.into();
+    pub fn new(source: String) -> Self {
         let lines = source.lines().map(String::from).collect();
         Self { source, lines }
     }
 
-    /// Formats an error message with one line of context.
+    /// Formats an error message with source context.
     ///
-    /// This is a convenience method that calls `format_error_with_context`
-    /// with `context_lines = 1`.
+    /// Generates a formatted error message including:
+    /// - The error message
+    /// - The source line where the error occurred
+    /// - A caret (^) pointing to the error column
     ///
     /// # Arguments
     ///
     /// * `message` - The error message to display
-    /// * `line` - The line number where the error occurred (1-based)
-    /// * `column` - The column number where the error occurred (1-based)
+    /// * `line` - The line number (1-based) where the error occurred
+    /// * `column` - The column number (1-based) where the error occurred
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ErrorFormatter;
+    /// use rpn2tex::error::ErrorFormatter;
     ///
-    /// let source = "3 4 + !";
+    /// let source = "2 3 ^".to_string();
     /// let formatter = ErrorFormatter::new(source);
-    /// let error = formatter.format_error("Unexpected character '!'", 1, 7);
-    /// assert!(error.contains("Error: Unexpected character '!'"));
-    /// assert!(error.contains("3 4 + !"));
-    /// assert!(error.contains("^"));
+    /// let formatted = formatter.format_error("Unexpected character '^'", 1, 5);
+    /// assert!(formatted.contains("Error: Unexpected character '^'"));
     /// ```
     #[must_use]
     pub fn format_error(&self, message: &str, line: u32, column: u32) -> String {
-        self.format_error_with_context(message, line, column, 1)
+        let context = self.get_context(line, column, 1);
+        format!("Error: {message}\n\n{context}")
     }
 
-    /// Formats an error message with the specified number of context lines.
+    /// Gets source context for an error position.
     ///
-    /// Displays the error message along with surrounding source lines for context.
-    /// A caret (^) is placed under the error location to indicate the exact position.
+    /// Returns formatted context showing the source line and a caret
+    /// pointing to the error column.
     ///
     /// # Arguments
     ///
-    /// * `message` - The error message to display
-    /// * `line` - The line number where the error occurred (1-based)
-    /// * `column` - The column number where the error occurred (1-based)
-    /// * `context_lines` - Number of lines to show before and after the error line
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::ErrorFormatter;
-    ///
-    /// let source = "line1\nline2\nline3\nline4\nline5";
-    /// let formatter = ErrorFormatter::new(source);
-    /// let error = formatter.format_error_with_context("Error here", 3, 2, 2);
-    /// assert!(error.contains("Error: Error here"));
-    /// assert!(error.contains("line1"));
-    /// assert!(error.contains("line3"));
-    /// assert!(error.contains("line5"));
-    /// ```
-    #[must_use]
-    pub fn format_error_with_context(
-        &self,
-        message: &str,
-        line: u32,
-        column: u32,
-        context_lines: usize,
-    ) -> String {
-        let mut result = format!("Error: {message}\n");
-        result.push_str(&self.get_context(line, column, context_lines));
-        result
-    }
+    /// * `line` - The line number (1-based) where the error occurred
+    /// * `column` - The column number (1-based) where the error occurred
+    /// * `context_lines` - Number of context lines to show (currently only 1 is used)
+    fn get_context(&self, line: u32, column: u32, context_lines: u32) -> String {
+        let _ = context_lines; // Reserved for future use
 
-    /// Gets the context lines around an error location (private helper).
-    ///
-    /// Extracts and formats the source lines surrounding the error,
-    /// with line numbers and a caret indicator.
-    fn get_context(&self, line: u32, column: u32, context_lines: usize) -> String {
-        use std::fmt::Write;
+        // Convert to 0-based index
+        let line_index = (line as usize).saturating_sub(1);
 
-        if self.lines.is_empty() {
+        if line_index >= self.lines.len() {
             return String::new();
         }
 
-        // Convert 1-based line to 0-based index
-        let error_idx = line.saturating_sub(1) as usize;
+        let source_line = &self.lines[line_index];
 
-        // Calculate context range with boundary checking
-        let start_idx = error_idx.saturating_sub(context_lines);
-        let end_idx = (error_idx + context_lines + 1).min(self.lines.len());
+        // Format: "<line_num> | <source_line>"
+        let line_display = format!("{line} | {source_line}");
 
-        // If the line is completely out of bounds, return empty
-        if error_idx >= self.lines.len() {
-            return String::new();
-        }
+        // Calculate padding for the caret line
+        // We need to match the width of the line number + " | " + (column - 1) spaces
+        let line_num_width = line.to_string().len();
+        let padding_before_caret = line_num_width + 3 + (column as usize).saturating_sub(1);
+        let caret_line = format!("{}^", " ".repeat(padding_before_caret));
 
-        // Calculate the width needed for line numbers (based on the max line number in range)
-        let max_line_num = end_idx;
-        let width = max_line_num.to_string().len();
-
-        let mut context = String::new();
-
-        for (idx, line_content) in self.lines[start_idx..end_idx].iter().enumerate() {
-            let line_num = start_idx + idx + 1; // Convert back to 1-based
-            let _ = writeln!(context, "{line_num:>width$} | {line_content}");
-
-            // Add caret line if this is the error line
-            if start_idx + idx == error_idx {
-                let spaces = " ".repeat(width);
-                let caret_offset = (column as usize).saturating_sub(1);
-                let caret_spacing = " ".repeat(caret_offset);
-                let _ = writeln!(context, "{spaces} | {caret_spacing}^");
-            }
-        }
-
-        context
+        format!("{line_display}\n{caret_line}")
     }
 }
 
@@ -166,203 +113,120 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_formatter_new() {
-        let formatter = ErrorFormatter::new("line1\nline2\nline3");
-        assert_eq!(formatter.lines.len(), 3);
-        assert_eq!(formatter.lines[0], "line1");
-        assert_eq!(formatter.lines[1], "line2");
-        assert_eq!(formatter.lines[2], "line3");
-    }
-
-    #[test]
-    fn test_error_formatter_new_with_string() {
-        let source = String::from("test");
-        let formatter = ErrorFormatter::new(source);
+    fn test_formatter_creation() {
+        let source = "5 3 +".to_string();
+        let formatter = ErrorFormatter::new(source.clone());
+        assert_eq!(formatter.source, source);
         assert_eq!(formatter.lines.len(), 1);
-        assert_eq!(formatter.lines[0], "test");
     }
 
     #[test]
-    fn test_format_error_single_line() {
-        let source = "3 4 + !";
+    fn test_multiline_source() {
+        let source = "5 3 +\n2 3 ^".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Unexpected character '!'", 1, 7);
-
-        assert!(error.contains("Error: Unexpected character '!'"));
-        assert!(error.contains("1 | 3 4 + !"));
-        assert!(error.contains("  |       ^"));
+        assert_eq!(formatter.lines.len(), 2);
+        assert_eq!(formatter.lines[0], "5 3 +");
+        assert_eq!(formatter.lines[1], "2 3 ^");
     }
 
     #[test]
-    fn test_format_error_with_context_multiple_lines() {
-        let source = "line1\nline2\nline3\nline4\nline5";
+    fn test_format_error_basic() {
+        let source = "2 3 ^".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error_with_context("Error here", 3, 2, 1);
+        let formatted = formatter.format_error("Unexpected character '^'", 1, 5);
 
-        assert!(error.contains("Error: Error here"));
-        assert!(error.contains("2 | line2"));
-        assert!(error.contains("3 | line3"));
-        assert!(error.contains("4 | line4"));
-        assert!(error.contains("  |  ^"));
+        assert!(formatted.contains("Error: Unexpected character '^'"));
+        assert!(formatted.contains("1 | 2 3 ^"));
+        assert!(formatted.contains("^"));
     }
 
     #[test]
-    fn test_format_error_at_start_of_file() {
-        let source = "line1\nline2\nline3";
+    fn test_format_error_with_position() {
+        let source = "5 3 +".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Error at start", 1, 1);
+        let formatted = formatter.format_error("Test error", 1, 3);
 
-        assert!(error.contains("Error: Error at start"));
-        assert!(error.contains("1 | line1"));
-        assert!(error.contains("2 | line2"));
-        assert!(error.contains("  | ^"));
+        // Check that the caret is at the correct position
+        let lines: Vec<&str> = formatted.lines().collect();
+        assert!(lines[0].contains("Error: Test error"));
+        assert!(lines[2].contains("1 | 5 3 +"));
+        // The caret should be at column 3
+        assert!(lines[3].trim_start().starts_with("^"));
     }
 
     #[test]
-    fn test_format_error_at_end_of_file() {
-        let source = "line1\nline2\nline3";
+    fn test_get_context() {
+        let source = "5 3 +".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Error at end", 3, 5);
+        let context = formatter.get_context(1, 1, 1);
 
-        assert!(error.contains("Error: Error at end"));
-        assert!(error.contains("2 | line2"));
-        assert!(error.contains("3 | line3"));
-        assert!(error.contains("  |     ^"));
+        assert!(context.contains("1 | 5 3 +"));
+        assert!(context.contains("^"));
     }
 
     #[test]
-    fn test_format_error_out_of_bounds_line() {
-        let source = "line1\nline2";
+    fn test_get_context_multiline() {
+        let source = "5 3 +\n2 3 ^".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Out of bounds", 10, 1);
+        let context = formatter.get_context(2, 5, 1);
 
-        // Should handle gracefully - just show the header
-        assert!(error.contains("Error: Out of bounds"));
-        // Context should be empty for out-of-bounds line
-        assert!(!error.contains("line1"));
-        assert!(!error.contains("line2"));
+        assert!(context.contains("2 | 2 3 ^"));
+        assert!(context.contains("^"));
     }
 
     #[test]
-    fn test_format_error_empty_source() {
-        let formatter = ErrorFormatter::new("");
-        let error = formatter.format_error("Error in empty source", 1, 1);
-
-        assert!(error.contains("Error: Error in empty source"));
-        // No context lines should be present
-        assert!(!error.contains("|"));
-    }
-
-    #[test]
-    fn test_column_positioning() {
-        let source = "0123456789";
+    fn test_caret_position_column_1() {
+        let source = "abc".to_string();
         let formatter = ErrorFormatter::new(source);
+        let context = formatter.get_context(1, 1, 1);
 
-        // Test various column positions
-        let error1 = formatter.format_error("At column 1", 1, 1);
-        assert!(error1.contains("  | ^"));
-
-        let error5 = formatter.format_error("At column 5", 1, 5);
-        assert!(error5.contains("  |     ^"));
-
-        let error10 = formatter.format_error("At column 10", 1, 10);
-        assert!(error10.contains("  |          ^"));
+        let lines: Vec<&str> = context.lines().collect();
+        assert_eq!(lines[0], "1 | abc");
+        // Caret should be at position 1 (under 'a')
+        // "1 | abc" has "1 | " = 4 characters before content
+        // Column 1 means 0 spaces before caret
+        assert!(lines[1].starts_with("    ^"));
     }
 
     #[test]
-    fn test_line_number_width_alignment() {
-        // Test with single-digit line numbers
-        let source = "line1\nline2\nline3";
+    fn test_caret_position_column_5() {
+        let source = "2 3 ^".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Test", 2, 1);
-        assert!(error.contains("1 | line1"));
-        assert!(error.contains("2 | line2"));
-        assert!(error.contains("3 | line3"));
+        let context = formatter.get_context(1, 5, 1);
 
-        // Test with double-digit line numbers
-        let mut long_source = String::new();
-        for i in 1..=15 {
-            if i > 1 {
-                long_source.push('\n');
-            }
-            long_source.push_str(&format!("line{i}"));
-        }
-        let formatter = ErrorFormatter::new(&long_source);
-        let error = formatter.format_error_with_context("Test", 10, 1, 2);
-
-        // Line numbers should be right-aligned with width 2
-        assert!(error.contains(" 8 | line8"));
-        assert!(error.contains(" 9 | line9"));
-        assert!(error.contains("10 | line10"));
-        assert!(error.contains("11 | line11"));
-        assert!(error.contains("12 | line12"));
+        let lines: Vec<&str> = context.lines().collect();
+        assert_eq!(lines[0], "1 | 2 3 ^");
+        // "1 | " = 4 characters, then 4 more spaces for columns 1-4, then caret
+        assert!(lines[1].starts_with("        ^"));
     }
 
     #[test]
-    fn test_context_lines_zero() {
-        let source = "line1\nline2\nline3";
+    fn test_format_error_multiline() {
+        let source = "5 3 +\n2 3 ^".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error_with_context("Only error line", 2, 3, 0);
+        let formatted = formatter.format_error("Unexpected character '^'", 2, 5);
 
-        assert!(error.contains("Error: Only error line"));
-        assert!(error.contains("2 | line2"));
-        assert!(!error.contains("line1"));
-        assert!(!error.contains("line3"));
+        assert!(formatted.contains("Error: Unexpected character '^'"));
+        assert!(formatted.contains("2 | 2 3 ^"));
+        assert!(formatted.contains("^"));
     }
 
     #[test]
-    fn test_context_lines_large() {
-        let source = "line1\nline2\nline3";
+    fn test_empty_source() {
+        let source = String::new();
         let formatter = ErrorFormatter::new(source);
-        // Request 100 lines of context, should safely clamp to available lines
-        let error = formatter.format_error_with_context("Large context", 2, 1, 100);
+        let formatted = formatter.format_error("Test error", 1, 1);
 
-        assert!(error.contains("1 | line1"));
-        assert!(error.contains("2 | line2"));
-        assert!(error.contains("3 | line3"));
+        assert!(formatted.contains("Error: Test error"));
     }
 
     #[test]
-    fn test_error_formatter_clone() {
-        let formatter = ErrorFormatter::new("test source");
-        let cloned = formatter.clone();
-        assert_eq!(formatter, cloned);
-        assert_eq!(formatter.source, cloned.source);
-        assert_eq!(formatter.lines, cloned.lines);
-    }
-
-    #[test]
-    fn test_multiline_formatting() {
-        let source = "def foo():\n    return bar\n    + baz";
+    fn test_out_of_bounds_line() {
+        let source = "5 3 +".to_string();
         let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error_with_context("Invalid syntax", 2, 5, 1);
+        let context = formatter.get_context(10, 1, 1);
 
-        assert!(error.contains("Error: Invalid syntax"));
-        assert!(error.contains("1 | def foo():"));
-        assert!(error.contains("2 |     return bar"));
-        assert!(error.contains("3 |     + baz"));
-        assert!(error.contains("  |     ^"));
-    }
-
-    #[test]
-    fn test_single_line_source() {
-        let formatter = ErrorFormatter::new("single line");
-        let error = formatter.format_error("Error", 1, 8);
-
-        assert!(error.contains("Error: Error"));
-        assert!(error.contains("1 | single line"));
-        assert!(error.contains("  |        ^"));
-    }
-
-    #[test]
-    fn test_rpn_example() {
-        let source = "3 4 + !";
-        let formatter = ErrorFormatter::new(source);
-        let error = formatter.format_error("Unexpected character '!'", 1, 7);
-
-        let lines: Vec<&str> = error.lines().collect();
-        assert_eq!(lines[0], "Error: Unexpected character '!'");
-        assert_eq!(lines[1], "1 | 3 4 + !");
-        assert_eq!(lines[2], "  |       ^");
+        // Should return empty string for out-of-bounds line
+        assert_eq!(context, "");
     }
 }
