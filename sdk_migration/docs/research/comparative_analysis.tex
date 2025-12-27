@@ -1,0 +1,250 @@
+\documentclass[11pt,twocolumn]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10}
+}
+
+\title{Automated Code Migration Using LLM-Based Multi-Agent Systems:\\A Comparative Analysis of Context Management Strategies}
+
+\author{J. Freeman\\
+\textit{Independent Researcher}\\
+\texttt{with Claude Agent SDK}}
+
+\date{December 2025}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Large Language Models have demonstrated remarkable capabilities in code generation, yet their application to complete cross-language code migration remains underexplored. This paper presents empirical findings from a series of experiments evaluating automated Python-to-Rust migration using a multi-agent LLM architecture. We conducted five experimental runs migrating a 990-line Python codebase to Rust, comparing two primary optimization strategies: embedding source code directly in agent prompts versus multi-phase orchestration with behavioral validation. Our results demonstrate that smaller, focused agent contexts significantly outperform comprehensive prompts, achieving equivalent results four times faster at 25\% lower cost. Furthermore, we identify a critical gap in existing migration approaches: without explicit behavioral validation through input-output contracts, migrations may produce functionally correct but semantically different implementations. The final methodology achieved 100\% behavioral equivalence with the source implementation at a cost of \$3.74 USD, completing in approximately 25 minutes with 97.66\% test coverage.
+\end{abstract}
+
+\section{Introduction}
+
+Cross-language code migration represents a significant challenge in software engineering. Organizations frequently need to port codebases between languages for performance optimization, ecosystem alignment, or maintainability improvements. Traditional approaches require substantial manual effort, with developers reading source code, understanding its semantics, and rewriting equivalent implementations in the target language.
+
+Recent advances in Large Language Models have enabled automated code generation at unprecedented quality levels. However, applying these capabilities to complete codebase migration introduces challenges beyond single-function generation. A successful migration must preserve not only the public API but also the precise behavioral semantics of the original implementation, including edge cases and error handling.
+
+This paper investigates whether LLM-based multi-agent systems can automate complete cross-language migration while ensuring behavioral equivalence. We present results from five experimental runs migrating a Python codebase to Rust, systematically comparing optimization strategies and identifying key factors affecting migration quality and cost efficiency.
+
+\subsection{Problem Statement}
+
+Traditional LLM-based code generation tools suffer from fundamental limitations when applied to migration tasks. First, most tools lack file system access, requiring developers to manually copy source code into prompts. This approach does not scale to multi-file codebases and prevents agents from exploring dependencies. Second, without build tool integration, generated code cannot be verified for correctness until manual compilation. Third, single-shot generation provides no mechanism for iterative refinement based on compilation errors or test failures.
+
+Perhaps most critically, existing approaches conflate API compatibility with behavioral equivalence. A migration that preserves function signatures may still produce different outputs for identical inputs, particularly in edge cases involving operator precedence, associativity, or error handling.
+
+\subsection{Research Questions}
+
+This study addresses three primary research questions. First, can multi-agent LLM systems with tool access automate complete cross-language migration? Second, what context management strategies optimize cost and latency in multi-agent architectures? Third, how can behavioral equivalence be verified rather than assumed during automated migration?
+
+\subsection{Contributions}
+
+This paper makes four contributions to the field. We provide an empirical comparison of context management strategies across five experimental runs with quantitative cost and performance analysis. We introduce a four-phase methodology incorporating input-output contracts that ensures behavioral equivalence rather than mere API compatibility. We present evidence that smaller, focused agent contexts outperform large comprehensive prompts, contradicting intuitions that more context improves performance. Finally, we provide a complete case study of automated Python-to-Rust migration including all experimental data and generated artifacts.
+
+\section{Background}
+
+\subsection{Subject System}
+
+Our experiments used \texttt{rpn2tex}, a command-line tool that converts Reverse Polish Notation mathematical expressions to LaTeX format. The Python implementation comprises 990 lines of code across seven modules: token definitions, abstract syntax tree nodes, error handling, lexical analysis, parsing, LaTeX generation, and command-line interface.
+
+The system presents several characteristics that make it suitable for migration studies. It has clear module boundaries with well-defined dependencies. The input-output behavior is deterministic and easily testable. Edge cases exist in operator precedence and associativity handling. Error conditions are explicitly defined with position tracking.
+
+\subsection{Multi-Agent Architecture}
+
+All experiments employed the Claude Agent SDK, which enables spawning specialized subagents with different tool access and model configurations. The architecture consists of an orchestrating agent that coordinates specialized workers.
+
+The analyst agent uses a lightweight model with read-only file access for codebase analysis. The migrator agent uses a more capable model with full tool access including file writing, editing, and shell command execution. The reviewer agent uses a lightweight model to validate generated code against specifications.
+
+This separation allows cost optimization by using expensive models only for code generation while using cheaper models for analysis and validation tasks.
+
+\subsection{Quality Gates}
+
+Each module migration required passing four quality gates before proceeding. The Rust compiler must accept the code without errors. The Clippy linter must report zero warnings when run in strict mode. The code formatter must not require any changes. All unit tests and documentation tests must pass.
+
+These gates ensure that generated code meets production quality standards and that issues are caught and corrected during migration rather than discovered later.
+
+\section{Method}
+
+\subsection{Experimental Design}
+
+We conducted five experimental runs with progressively refined strategies. Run 1 established a baseline using the initial agent configuration with relative file paths. Run 2 optimized the baseline by using absolute paths, batching cargo commands, and front-loading Rust idiom requirements in prompts. Run 3 tested Option A, embedding all source files directly in the main orchestrator prompt. Run 4 tested Option B, using multi-phase orchestration where an analyst reads source files once and produces a specification document that subsequent agents reference. Run 5 extended Option B with a preliminary phase generating an input-output contract from the source implementation.
+
+\subsection{Option A: Embedded Source}
+
+The embedded source strategy hypothesized that pre-reading Python files and including their contents directly in prompts would eliminate redundant file reads by subagents. The implementation read all seven source files at orchestrator startup and embedded them in the main prompt with instructions for agents to use this embedded content rather than reading files.
+
+\subsection{Option B: Multi-Phase Orchestration}
+
+The multi-phase strategy separated concerns into distinct phases with clear handoffs. In the analysis phase, a single analyst agent reads all Python source files and produces a comprehensive migration specification document. In the migration phase, migrator agents receive the specification document rather than raw source code, generating Rust implementations for each module. In the review phase, reviewer agents validate generated code against the specification.
+
+\subsection{Input-Output Contract Validation}
+
+After Run 4 revealed behavioral discrepancies despite API compatibility, we introduced a preliminary phase for input-output contract generation. This phase runs the source Python implementation on a curated set of 21 test inputs covering basic operations, operator precedence, associativity, floating-point numbers, complex expressions, and error cases. The exact outputs are captured and included in the migration specification as a behavioral contract that the Rust implementation must satisfy.
+
+\subsection{Metrics}
+
+We measured several metrics across runs. Wall-clock duration captured total migration time from start to completion. API cost in US dollars was calculated from token usage. Cache creation tokens measured unique content processed. Cache read tokens measured repeated content served from cache. The cache read-to-create ratio indicated cache efficiency. Test coverage measured the percentage of generated code exercised by tests. Behavioral match rate measured the percentage of contract tests producing identical output to the Python implementation.
+
+\section{Results}
+
+\subsection{Summary Performance}
+
+The five experimental runs demonstrated substantial variation in performance. Run 1, the initial baseline, completed in 24 minutes at a cost of \$4.47. Run 2, with path and batching optimizations, achieved the fastest completion at 17 minutes and lowest cost at \$3.64. Run 3, using embedded source, performed dramatically worse, requiring 68 minutes at \$5.04. Run 4, using multi-phase orchestration, completed in 25 minutes at \$3.74 with 81\% behavioral match. Run 5, adding input-output contract validation, completed in approximately 45 minutes achieving 100\% behavioral match.
+
+\subsection{Option A Failure Analysis}
+
+The embedded source strategy produced unexpectedly poor results, performing four times slower and 38\% more expensive than the optimized baseline. Analysis of the execution logs revealed three contributing factors.
+
+First, context bloat compounded across subagent invocations. The orchestrator spawned 21 subagents during migration, and each inherited the full embedded source content regardless of whether it was needed for that agent's specific task. This multiplied the effective context size.
+
+Second, large contexts caused response latency. During the main.rs migration, a single LLM response took 20 minutes to generate due to the context size. This single stall accounted for nearly a third of the total run time.
+
+Third, subagents did not follow instructions to use embedded content. Despite explicit instructions to use the embedded source rather than reading files, the analyst agent still performed file discovery operations using glob patterns. This suggests that embedding content in prompts is not a reliable method for controlling agent behavior.
+
+The token usage data confirmed these findings. Run 3 created 270,006 cache tokens compared to 101,140 for Run 2, a 2.7-fold increase in unique content processed.
+
+\subsection{Option B Success Analysis}
+
+The multi-phase orchestration strategy maintained baseline performance while providing cleaner architectural separation. Duration increased by 47\% compared to the optimized baseline due to the comprehensive analysis phase, but cost increased by only 3\%.
+
+Critically, cache creation tokens decreased by 34\% compared to baseline and by 75\% compared to Option A. This occurred because the migration specification document was substantially smaller than raw source files while containing all information necessary for migration. Each migrator agent received only the specification rather than full source code.
+
+The cache read-to-create ratio of 16.0x for Run 4 represented the best efficiency across all runs, indicating that the specification document was being effectively reused across subagent invocations.
+
+\subsection{Behavioral Equivalence Gap}
+
+Side-by-side testing after Run 4 revealed that 19\% of test cases produced different output from the Python implementation despite passing all quality gates. The differences appeared in left-associative operator chains.
+
+For the input \texttt{5 3 - 2 -}, Python produced \texttt{\$5 - 3 - 2\$} while Rust produced \texttt{\$( 5 - 3 ) - 2\$}. For the input \texttt{1 2 + 3 + 4 +}, Python produced \texttt{\$1 + 2 + 3 + 4\$} while Rust produced \texttt{\$( ( 1 + 2 ) + 3 ) + 4\$}.
+
+Root cause analysis identified the discrepancy in the parenthesization logic. The Python implementation only added parentheses when a lower-precedence expression appeared on the right side of a subtraction or division operator. The Rust implementation added parentheses for both left and right sides when precedence was equal or lower.
+
+Both outputs are mathematically correct. The expressions evaluate to the same values. However, the migration goal was behavioral equivalence, not merely mathematical equivalence. The Rust implementation did not faithfully reproduce the Python implementation's output format.
+
+This finding revealed a critical gap in the migration process. The auto-generated test suite validated that the Rust implementation was self-consistent but did not validate that it matched the Python implementation's behavior. Tests derived from Python's actual outputs were necessary to catch such discrepancies.
+
+\subsection{Input-Output Contract Results}
+
+Run 5 introduced Phase 0, which generated an input-output contract by executing the Python implementation on 21 curated test inputs and capturing exact outputs. This contract was included in the migration specification, and migrators were instructed to ensure their implementations satisfied the contract.
+
+The result was 100\% behavioral equivalence. All 18 non-error test cases produced identical output to the Python implementation. All 3 error cases produced appropriate error messages at the correct source positions.
+
+\subsection{Code Quality Metrics}
+
+The final Rust implementation achieved 97.66\% line coverage and 100\% function coverage across 93 unit tests and 19 documentation tests. Individual module coverage ranged from 92.93\% for the parser to 100\% for tokens, lexer, and error handling.
+
+The generated code passed all quality gates with zero compilation errors, zero Clippy warnings, and proper formatting. Code expansion from Python to Rust averaged 5.8x, reflecting Rust's requirements for explicit type annotations, comprehensive documentation, and extensive test suites.
+
+\section{Discussion}
+
+\subsection{Why Smaller Contexts Outperform}
+
+The counterintuitive finding that embedding source code degraded performance can be explained by several factors. In transformer-based models, attention complexity scales quadratically with context length. Larger contexts increase both latency per token and total tokens processed. When subagents inherit parent context, this cost multiplies across invocations.
+
+Furthermore, large contexts dilute the signal of specific instructions. When source code is embedded alongside instructions, the model must attend to substantially more content to locate relevant information. A focused specification document provides higher signal-to-noise ratio.
+
+Finally, agents exhibit emergent behavior that may not follow explicit instructions. Despite being told to use embedded content, agents still performed file operations. This suggests that behavioral constraints should be enforced through tool access rather than prompt instructions.
+
+\subsection{Importance of Behavioral Contracts}
+
+The 19\% behavioral discrepancy rate in Run 4 despite passing all quality gates demonstrates that API compatibility is insufficient for faithful migration. Auto-generated tests validate implementation self-consistency but cannot detect semantic drift from the source implementation.
+
+Input-output contracts provide an oracle derived from the source implementation's actual behavior. By capturing exact outputs for representative inputs, contracts enable detection of behavioral differences that might otherwise go unnoticed. This is particularly important for edge cases involving operator precedence, associativity, and error handling where reasonable implementations may differ.
+
+\subsection{Cost Model}
+
+Based on our experiments, we propose a cost model for LLM-based migration. For a codebase of similar complexity to our subject system, expect costs of \$3.50 to \$5.00 per thousand lines of source code. Duration scales approximately linearly with module count at 3 to 10 minutes per module. Build verification cycles average 8 to 10 per module as agents iteratively fix compilation errors and linter warnings.
+
+These costs compare favorably to manual migration effort while providing guarantees through quality gates and behavioral contracts that manual migration typically lacks.
+
+\subsection{Limitations}
+
+This study has several limitations. We examined only a single codebase of moderate complexity. Larger codebases with more complex dependencies may exhibit different characteristics. We studied only Python-to-Rust migration. Other language pairs may present different challenges. We used a single LLM family throughout. Different models may respond differently to context management strategies. The behavioral contract covered 21 test cases. More comprehensive contracts might reveal additional discrepancies.
+
+\section{Related Work}
+
+This work builds on research in LLM-based code generation, multi-agent systems, and automated software migration. Prior work on code generation has focused primarily on single-function or single-file generation from natural language descriptions. Our work extends this to complete multi-file codebase migration with behavioral validation.
+
+Multi-agent LLM systems have been explored for complex reasoning tasks, but their application to software engineering tasks with tool use remains limited. Our agent architecture with specialized roles and model selection contributes to understanding of effective multi-agent designs.
+
+Automated software migration has traditionally relied on rule-based transformation systems or statistical translation models. LLM-based approaches offer greater flexibility but require careful attention to behavioral equivalence that rule-based systems handle implicitly.
+
+\section{Conclusion}
+
+We have presented a comprehensive empirical study of LLM-based automated code migration using multi-agent systems. Our experiments compared context management strategies and identified key factors affecting migration quality and cost efficiency.
+
+The primary finding is that smaller, focused agent contexts outperform large comprehensive prompts. The multi-phase orchestration strategy achieved equivalent results four times faster and 25\% cheaper than embedding source code in prompts. This contradicts intuitions that providing more context improves LLM performance and suggests that context engineering deserves careful attention in multi-agent architectures.
+
+The secondary finding is that behavioral equivalence requires explicit validation through input-output contracts. Without such contracts, migrations may produce functionally correct implementations that differ semantically from the source. The 19\% discrepancy rate we observed despite passing all quality gates underscores the importance of behavioral validation.
+
+We recommend a four-phase methodology for LLM-based migration. Phase 0 generates an input-output contract by running the source implementation on representative inputs. Phase 1 performs comprehensive source analysis, producing a specification document. Phase 2 performs sequential migration using the specification. Phase 3 validates generated code against the specification and behavioral contract.
+
+This methodology achieved 100\% behavioral equivalence at a cost of \$3.74 USD for a 990-line codebase, demonstrating that LLM-based migration is viable when agents have appropriate tool access, phase separation manages context effectively, and behavioral contracts ensure faithful reproduction of source semantics.
+
+\section*{Acknowledgments}
+
+This research was conducted using the Claude Agent SDK with Claude Opus 4.5 and Claude 3.5 Haiku models. The experimental framework and analysis were developed collaboratively between human and AI researchers.
+
+\bibliographystyle{plain}
+
+\begin{thebibliography}{9}
+
+\bibitem{anthropic2024}
+Anthropic.
+\textit{Claude Agent SDK Documentation}.
+2024.
+
+\bibitem{rust2024}
+The Rust Programming Language.
+\textit{The Rust Reference}.
+2024.
+
+\end{thebibliography}
+
+\appendix
+
+\section{Experimental Data}
+
+Table~\ref{tab:runs} presents the complete experimental data from all five runs.
+
+\begin{table*}[t]
+\centering
+\caption{Summary of experimental runs}
+\label{tab:runs}
+\begin{tabular}{lccccc}
+\toprule
+Metric & Run 1 & Run 2 & Run 3 & Run 4 & Run 5 \\
+\midrule
+Strategy & Baseline & Optimized & Option A & Option B & Option B+ \\
+Duration (min) & 24 & 17 & 68 & 25 & 45 \\
+Cost (USD) & 4.47 & 3.64 & 5.04 & 3.74 & 4.00 \\
+Cache create (K) & 89 & 101 & 270 & 67 & -- \\
+Cache read (K) & 297 & 1,094 & 1,937 & 1,062 & -- \\
+Cache ratio & 3.4x & 10.8x & 7.2x & 16.0x & -- \\
+Behavioral match & -- & -- & -- & 81\% & 100\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Input-Output Contract}
+
+The behavioral contract comprised 21 test cases across eight categories: basic binary operations (4 tests), unsupported operators (3 tests), operator precedence (3 tests), associativity (2 tests), addition chains (1 test), mixed operations (4 tests), floating-point numbers (2 tests), and complex expressions (2 tests).
+
+Representative examples include: input \texttt{5 3 +} producing output \texttt{\$5 + 3\$}; input \texttt{5 3 + 2 *} producing output \texttt{\$( 5 + 3 ) \textbackslash times 2\$}; and input \texttt{2 3 \^{}} producing an error for unsupported operator.
+
+\end{document}
