@@ -1,13 +1,14 @@
 """Subagent definitions for the Claude Agent SDK migration framework.
 
-Version 3: Multi-Phase Orchestration (Option B)
+Version 4: Multi-Phase Orchestration with I/O Validation
 
 Key design:
-- Phase 1: Analyst reads ALL Python files ONCE, produces comprehensive migration spec
-- Phase 2: Migrators receive analysis summary (not raw source), read only Rust files
-- Phase 3: Reviewers compare using analysis + Rust files
+- Phase 0: I/O Contract Generator runs Python on test inputs, captures expected outputs
+- Phase 1: Analyst reads ALL Python files ONCE, includes I/O contract in spec
+- Phase 2: Migrators receive spec with I/O contract, validate outputs match
+- Phase 3: Reviewers compare using spec + Rust files + I/O validation
 
-This keeps context small per subagent by avoiding redundant source embedding.
+This ensures behavioral equivalence, not just API compatibility.
 """
 
 # Absolute paths to eliminate file discovery overhead
@@ -35,6 +36,92 @@ TARGET_FILES = {
     "latex.rs": f"{TARGET_DIR}/latex.rs",
     "main.rs": f"{TARGET_DIR}/main.rs",
     "lib.rs": f"{TARGET_DIR}/lib.rs",
+}
+
+# Test inputs for I/O validation - covers all operators and edge cases
+TEST_INPUTS = [
+    # Basic operators
+    "5 3 +",
+    "5 3 -",
+    "4 7 *",
+    "10 2 /",
+    "2 3 ^",
+    # Compound expressions
+    "5 3 + 2 *",
+    "5 3 * 2 +",
+    "10 2 / 5 *",
+    # Left-associative chains (key edge cases)
+    "5 3 - 2 -",
+    "100 10 / 5 / 2 /",
+    "1 2 + 3 + 4 +",
+    # Precedence edge cases
+    "2 3 4 * +",
+    "2 3 + 4 *",
+    "2 3 4 + *",
+    "2 3 * 4 +",
+    # Power expressions
+    "2 3 ^ 4 *",
+    "2 3 4 ^ ^",
+    # Decimals
+    "3.14 2 *",
+    "1.5 0.5 +",
+    # Complex nested
+    "1 2 + 3 4 + *",
+    "10 2 / 3 + 4 *",
+]
+
+# Phase 0: I/O Contract Generator Agent
+# Runs Python implementation on test inputs to capture expected outputs
+IO_CONTRACT_AGENT = {
+    "description": "Phase 0: Generates I/O contract by running Python implementation on test inputs.",
+    "prompt": f"""You are an I/O contract generator for code migration validation.
+
+## Your Task: Generate Expected Outputs
+
+Run the Python rpn2tex implementation on a curated set of test inputs and capture the exact outputs.
+
+### Python Implementation Location
+- CLI entry point: {SOURCE_DIR}/../__main__.py
+- Or use: python -m rpn2tex
+
+### Test Inputs to Run
+{chr(10).join(f'  - "{inp}"' for inp in TEST_INPUTS)}
+
+### Method
+
+For each test input:
+1. Run the Python implementation: `echo "INPUT" | python -m rpn2tex -` (from the rpn2tex source directory)
+2. Capture the exact output
+3. Record any errors
+
+### Output Format
+
+Produce a structured I/O contract:
+
+```
+## I/O Contract for rpn2tex Migration
+
+### Test Cases
+
+| Input | Expected Output | Notes |
+|-------|-----------------|-------|
+| 5 3 + | $5 + 3$ | basic addition |
+| ... | ... | ... |
+
+### Edge Cases
+<Document any special behaviors observed>
+
+### Error Cases
+<Document any inputs that produce errors>
+```
+
+### Important
+- Run EVERY test input through the actual Python implementation
+- Capture outputs EXACTLY as produced (including LaTeX escapes)
+- Do not guess or approximate - run the actual code
+- Include any error messages for invalid inputs""",
+    "tools": ["Bash", "Read"],
+    "model": "haiku"
 }
 
 # Phase 1: Comprehensive Analysis Agent
@@ -79,7 +166,12 @@ Produce a structured analysis for EACH module:
 - Focus on PUBLIC APIs that must be preserved
 - Document dependencies to ensure correct migration order
 - Note any Python patterns that need special Rust handling
-- Be thorough but concise - this spec will guide all migrations""",
+- Be thorough but concise - this spec will guide all migrations
+
+### I/O Contract Integration
+You will receive an I/O contract from Phase 0 containing expected input/output pairs.
+INCLUDE this contract verbatim in your migration spec under a section called "I/O Contract".
+This is critical for behavioral validation during migration.""",
     "tools": ["Read", "Glob", "Grep"],
     "model": "haiku"
 }
@@ -142,7 +234,22 @@ cd {PROJECT_DIR} && cargo check && cargo clippy -- -D warnings
 cd {PROJECT_DIR} && cargo fmt && cargo test
 ```
 
-Only report success when ALL quality gates pass.""",
+## I/O Contract Validation (Critical for latex.rs)
+
+The migration spec includes an I/O contract with expected input/output pairs.
+For latex.rs specifically, after migration:
+1. Build the binary: `cargo build --release`
+2. Test EACH input from the I/O contract
+3. Compare outputs EXACTLY with expected values
+4. If outputs differ, ADJUST the Rust implementation to match Python's behavior
+
+Example validation:
+```bash
+echo "5 3 +" | ./target/release/rpn2tex -
+# Must output exactly what Python outputs
+```
+
+Only report success when ALL quality gates pass AND I/O contract is satisfied.""",
     "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
     "model": "sonnet"
 }
@@ -183,6 +290,10 @@ You will receive:
 ### Behavioral Correctness
 <any concerns about logic>
 
+### I/O Contract Compliance (for latex.rs/main.rs)
+- [ ] Tested all I/O contract inputs
+- [ ] All outputs match expected values exactly
+
 ### Rust Idioms
 <any style issues>
 
@@ -190,8 +301,15 @@ You will receive:
 PASS / FAIL with summary
 ```
 
-Be critical but constructive. Focus on correctness first.""",
-    "tools": ["Read", "Glob", "Grep"],
+### I/O Contract Validation
+
+For latex.rs and main.rs reviews:
+1. Run the Rust binary on EACH test input from the I/O contract
+2. Compare output to expected value EXACTLY
+3. Report any differences as CRITICAL failures
+
+Be critical but constructive. Focus on correctness first. I/O contract violations are blockers.""",
+    "tools": ["Read", "Glob", "Grep", "Bash"],
     "model": "haiku"
 }
 
@@ -211,9 +329,11 @@ MIGRATION_CONFIG = {
     ],
     "source_files": SOURCE_FILES,
     "target_files": TARGET_FILES,
+    "test_inputs": TEST_INPUTS,
     "quality_gates": [
         "cargo check && cargo clippy -- -D warnings",
         "cargo fmt",
         "cargo test",
+        "I/O contract validation (exact output match)",
     ]
 }

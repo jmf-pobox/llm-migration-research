@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Claude Agent SDK Migration Runner - Option B: Multi-Phase Orchestration
+Claude Agent SDK Migration Runner - Version 4: Multi-Phase with I/O Validation
 
-Uses a 3-phase approach to minimize context size per subagent:
-- Phase 1: Analyst reads ALL Python files ONCE, produces migration spec
-- Phase 2: For each module, migrator uses spec (not raw source)
-- Phase 3: For each module, reviewer validates against spec
+Uses a 4-phase approach to ensure behavioral equivalence:
+- Phase 0: I/O contract generator runs Python on test inputs, captures outputs
+- Phase 1: Analyst reads ALL Python files ONCE, includes I/O contract in spec
+- Phase 2: For each module, migrator uses spec and validates I/O contract
+- Phase 3: For each module, reviewer validates against spec + I/O contract
 
 Usage:
     python run_migration.py
@@ -34,8 +35,8 @@ except ImportError:
     sys.exit(1)
 
 from agents import (
-    ANALYST_AGENT, MIGRATOR_AGENT, REVIEWER_AGENT, MIGRATION_CONFIG,
-    SOURCE_FILES, TARGET_FILES, PROJECT_DIR
+    IO_CONTRACT_AGENT, ANALYST_AGENT, MIGRATOR_AGENT, REVIEWER_AGENT,
+    MIGRATION_CONFIG, SOURCE_FILES, TARGET_FILES, PROJECT_DIR, TEST_INPUTS
 )
 
 
@@ -62,7 +63,7 @@ def log(msg: str, also_print: bool = True) -> None:
 
 
 def build_migration_prompt() -> str:
-    """Build the multi-phase migration prompt (Option B)."""
+    """Build the multi-phase migration prompt (Version 4 with I/O validation)."""
     modules_list = "\n".join(
         f"    {i+1}. {m['python']} -> {m['rust']} ({m['phase']} phase)"
         for i, m in enumerate(MIGRATION_CONFIG["modules"])
@@ -76,37 +77,53 @@ def build_migration_prompt() -> str:
         f"    - {k}: {v}" for k, v in TARGET_FILES.items()
     )
 
+    test_inputs_list = "\n".join(
+        f'    - "{inp}"' for inp in TEST_INPUTS
+    )
+
     return f"""
-Migrate the rpn2tex Python codebase to Rust using a multi-phase approach.
+Migrate the rpn2tex Python codebase to Rust using a multi-phase approach with I/O validation.
 
-## IMPORTANT: Multi-Phase Orchestration
+## IMPORTANT: Multi-Phase Orchestration with I/O Contract
 
-This migration uses THREE distinct phases to minimize redundant file reads:
+This migration uses FOUR distinct phases to ensure behavioral equivalence:
 
-### PHASE 1: Comprehensive Analysis (DO THIS FIRST)
+### PHASE 0: I/O Contract Generation (DO THIS FIRST)
+
+Spawn the **io_contract** agent ONCE to:
+1. Run the Python implementation on curated test inputs
+2. Capture EXACT outputs for each input
+3. Produce an I/O contract document
+
+Test inputs to run:
+{test_inputs_list}
+
+SAVE the I/O contract - you will include it in the migration spec.
+
+### PHASE 1: Comprehensive Analysis
 
 Spawn the **analyst** agent ONCE to analyze ALL Python modules:
 - The analyst will read all 7 Python source files
 - It will produce a comprehensive migration specification
-- This spec contains all APIs, dependencies, and migration notes
-- SAVE this specification - you will use it for all subsequent phases
+- INCLUDE the I/O contract from Phase 0 in the spec
+- This spec guides all subsequent phases
 
 ### PHASE 2: Sequential Migration
 
 For EACH module in dependency order:
 1. Spawn the **migrator** agent with:
-   - The relevant section of the migration spec (from Phase 1)
+   - The relevant section of the migration spec (including I/O contract)
    - The specific module to migrate (python file -> rust file)
-2. WAIT for migrator to complete and verify the .rs file exists
+2. For latex.rs: migrator MUST validate outputs match I/O contract
 3. Migrator should NOT read Python files - use the spec instead
 
 ### PHASE 3: Sequential Review
 
 For EACH module, AFTER its migration completes:
 1. Spawn the **reviewer** agent with:
-   - The relevant section of the migration spec
+   - The relevant section of the migration spec (including I/O contract)
    - The Rust file path to review
-2. Reviewer reads Rust file and compares against spec
+2. For latex.rs/main.rs: reviewer MUST verify I/O contract compliance
 
 ## Source Files (analyst will read these in Phase 1):
 {source_files_list}
@@ -124,15 +141,16 @@ For EACH module, AFTER its migration completes:
 - `cargo check && cargo clippy -- -D warnings` - zero errors/warnings
 - `cargo fmt` - properly formatted
 - `cargo test` - tests pass
+- **I/O contract validation** - outputs must match Python EXACTLY
 
 ## Key Points:
-1. Phase 1 reads Python files ONCE - no redundant reads
-2. Migrators use the spec, not raw Python source
-3. Each module must pass quality gates before proceeding
-4. Update lib.rs after adding each new module
+1. Phase 0 generates I/O contract from Python - critical for validation
+2. Phase 1 reads Python files ONCE and includes I/O contract in spec
+3. Migrators validate against I/O contract, especially for latex.rs
+4. I/O contract violations are BLOCKERS - fix before proceeding
 5. Run all cargo commands from: {PROJECT_DIR}
 
-Begin with Phase 1: spawn the analyst to analyze ALL modules.
+Begin with Phase 0: spawn the io_contract agent to generate the I/O contract.
 """
 
 
@@ -147,13 +165,14 @@ async def run_migration(dry_run: bool = False) -> None:
         print(prompt)
         print("=" * 60)
         print("\nAgents configured:")
+        print(f"  - io_contract: {IO_CONTRACT_AGENT['description'][:60]}...")
         print(f"  - analyst: {ANALYST_AGENT['description'][:60]}...")
         print(f"  - migrator: {MIGRATOR_AGENT['description'][:60]}...")
         print(f"  - reviewer: {REVIEWER_AGENT['description'][:60]}...")
         return
 
     log("=" * 60)
-    log("Starting Claude Agent SDK Migration (Option B: Multi-Phase)")
+    log("Starting Claude Agent SDK Migration (Version 4: Multi-Phase with I/O Validation)")
     log("=" * 60)
     log(f"Source: {MIGRATION_CONFIG['source_dir']}")
     log(f"Target: {MIGRATION_CONFIG['target_dir']}")
@@ -163,6 +182,12 @@ async def run_migration(dry_run: bool = False) -> None:
 
     # Create AgentDefinition objects
     agents = {
+        "io_contract": AgentDefinition(
+            description=IO_CONTRACT_AGENT["description"],
+            prompt=IO_CONTRACT_AGENT["prompt"],
+            tools=IO_CONTRACT_AGENT["tools"],
+            model=IO_CONTRACT_AGENT["model"],
+        ),
         "analyst": AgentDefinition(
             description=ANALYST_AGENT["description"],
             prompt=ANALYST_AGENT["prompt"],
@@ -255,7 +280,7 @@ async def run_migration(dry_run: bool = False) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Migrate Python code to Rust using Claude Agent SDK (Multi-Phase)"
+        description="Migrate Python code to Rust using Claude Agent SDK (Version 4: Multi-Phase with I/O Validation)"
     )
     parser.add_argument(
         "--dry-run",

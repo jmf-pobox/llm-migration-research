@@ -247,6 +247,98 @@ All runs passed:
 
 ---
 
+## Side-by-Side Testing Results
+
+### Input/Output Comparison
+
+After Run 4, we performed side-by-side testing comparing Python and Rust outputs for identical inputs:
+
+| Input | Python Output | Rust Output | Match |
+|-------|---------------|-------------|-------|
+| `5 3 +` | `$5 + 3$` | `$5 + 3$` | ✓ |
+| `4 7 *` | `$4 \times 7$` | `$4 \times 7$` | ✓ |
+| `5 3 + 2 *` | `$( 5 + 3 ) \times 2$` | `$( 5 + 3 ) \times 2$` | ✓ |
+| `10 2 /` | `$10 \div 2$` | `$10 \div 2$` | ✓ |
+| `8 3 -` | `$8 - 3$` | `$8 - 3$` | ✓ |
+| `2 3 ^` | `$2^{3}$` | `$2^{3}$` | ✓ |
+| `5 3 - 2 -` | `$5 - 3 - 2$` | `$( 5 - 3 ) - 2$` | **✗** |
+| `100 10 / 5 / 2 /` | `$100 \div 10 \div 5 \div 2$` | `$( ( 100 \div 10 ) \div 5 ) \div 2$` | **✗** |
+| `1 2 + 3 + 4 +` | `$1 + 2 + 3 + 4$` | `$( ( 1 + 2 ) + 3 ) + 4$` | **✗** |
+
+**Result: 13/16 tests passed (81% exact match)**
+
+### Root Cause Analysis
+
+The 3 failing tests all involve **left-associative operator chains**. The difference is in the `needs_parens` function:
+
+**Python (latex_gen.py:176-180):**
+```python
+return (
+    child_precedence == parent_precedence
+    and is_right
+    and child.operator in ("-", "/")
+)
+```
+- Only adds parentheses for **right-side** equal-precedence `-` and `/`
+
+**Rust (latex.rs):**
+```rust
+fn needs_parens(...) -> bool {
+    match parent_op {
+        BinaryOp::Add | BinaryOp::Sub => child_op.precedence() <= parent_op.precedence(),
+        BinaryOp::Mul | BinaryOp::Div => child_op.precedence() <= parent_op.precedence(),
+        BinaryOp::Pow => child_op.precedence() < parent_op.precedence(),
+    }
+}
+```
+- Adds parentheses for **both left and right sides** when precedence is equal or lower
+
+**Mathematical Equivalence**: Both outputs are mathematically correct. The Rust version produces more explicit parenthesization, which is valid but differs from Python's minimal parentheses approach.
+
+### Key Finding
+
+The migration produced **functionally correct but stylistically different** output. The Rust test suite was auto-generated to match the Rust implementation, masking this discrepancy.
+
+### Implications for Migration Strategy
+
+This finding reveals a critical gap in the migration process:
+
+1. **Test Generation vs. Validation**: The migration generated tests that validate the Rust implementation, not the Python original. Tests should be derived from Python's actual outputs.
+
+2. **Missing I/O Contract**: The migration spec should include concrete input/output examples from the Python implementation, not just API signatures.
+
+3. **Review Phase Limitation**: The reviewer agent checked API completeness and Rust idioms, but couldn't detect behavioral differences without reference outputs.
+
+### Recommended Process Improvement
+
+Add **Phase 0: Generate I/O Test Cases** before analysis:
+
+```
+PHASE 0: I/O Contract Generation (NEW)
+├── Run Python implementation on curated test inputs
+├── Capture exact outputs for each input
+└── Include in migration spec as "Expected Outputs" section
+
+PHASE 1: Analysis (existing)
+├── Read all Python source files
+├── Analyze APIs and dependencies
+└── Include I/O contract in migration spec
+
+PHASE 2: Migration (existing)
+├── Use spec including I/O contract
+├── Run side-by-side tests after each module
+└── Fail fast if outputs differ
+
+PHASE 3: Review (existing)
+├── Validate against spec
+├── Verify I/O contract compliance
+└── Report any behavioral differences
+```
+
+This ensures the migration produces **exact behavioral equivalence**, not just API compatibility.
+
+---
+
 ## Future Improvements
 
 ### Potential Optimizations (Not Yet Tested)
