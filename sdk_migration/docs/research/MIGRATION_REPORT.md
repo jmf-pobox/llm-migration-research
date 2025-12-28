@@ -1,18 +1,38 @@
-# Claude Agent SDK Migration Experiment Report
+# Multi-Language Code Migration Experiment Report
+
+## Project Status: Phase 1 Complete
+
+**Completed:** Small-scale migration validated with two target languages (Rust, Java)
+**Next Phase:** Scale to medium-complexity codebase with external dependencies
+
+---
 
 ## Executive Summary
 
-This report documents an experiment using the **Claude Agent SDK** to automate Python-to-Rust code migration. The experiment successfully migrated the `rpn2tex` codebase (an RPN expression to LaTeX converter) with full functional equivalence verified.
+This report documents experiments using the **Claude Agent SDK** to automate cross-language code migration. We successfully migrated `rpn2tex` (an RPN expression to LaTeX converter) to both **Rust** and **Java**, achieving 100% behavioral equivalence in both cases.
+
+### Key Results
+
+| Metric | Rust | Java |
+|--------|------|------|
+| Duration | ~25 min | ~25 min |
+| Total Cost | $3.74 USD | $7.24 USD |
+| I/O Contract Match | 100% (21/21) | 100% (21/21) |
+| Production LOC | 1,158 | 1,262 |
+| Test Coverage | 97.66% | 95.87% |
+| Unit Tests | 72 | 226 |
+
+### Source System Complexity
+
+The source codebase was deliberately trivial to establish baseline feasibility:
 
 | Metric | Value |
 |--------|-------|
-| Python Source | 990 LOC |
-| Rust Output | 2,504 LOC |
-| Migration Cost | $4.47 USD |
-| Cost per 1k LOC (source) | **$4.52** |
-| Cost per 1k LOC (output) | **$1.79** |
-| Duration | ~24 minutes |
-| Success Rate | 100% (7/7 modules) |
+| Python Source | 352 LOC (production) |
+| Avg Cyclomatic Complexity | 2.8 (Grade A) |
+| Max Cyclomatic Complexity | 10 |
+| External Dependencies | None |
+| Module Dependencies | Unidirectional |
 
 ## Background
 
@@ -25,7 +45,7 @@ Traditional code migration approaches require significant manual effort or use L
 
 ### Hypothesis
 
-A multi-agent architecture using Claude Agent SDK with specialized subagents and full tool access could automate code migration with quality enforcement.
+A multi-agent architecture using Claude Agent SDK with specialized subagents and full tool access could automate code migration with quality enforcement across multiple target languages.
 
 ## Experimental Setup
 
@@ -47,240 +67,197 @@ A multi-agent architecture using Claude Agent SDK with specialized subagents and
 └─────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-### Subagent Roles
+### Four-Phase Methodology
 
-1. **Analyst (Haiku)**: Analyzes Python source, identifies dependencies, documents APIs
-2. **Migrator (Sonnet)**: Generates Rust code, runs build tools, fixes errors iteratively
-3. **Reviewer (Haiku)**: Validates functional equivalence, checks idiomatic patterns
+1. **Phase 0: I/O Contract** - Execute source on 21 test inputs, capture expected outputs
+2. **Phase 1: Analysis** - Analyst reads all source files, produces migration specification
+3. **Phase 2: Migration** - Migrators convert each module with quality gate feedback loops
+4. **Phase 3: Review** - Reviewers validate against specification and I/O contract
 
-### Quality Gates
+### Quality Gates by Language
 
-Each module must pass before proceeding:
+**Rust:**
 - `cargo check` - zero compilation errors
 - `cargo clippy -- -D warnings` - zero linter warnings
 - `cargo fmt` - proper formatting
 - `cargo test` - all tests pass
 
+**Java:**
+- `./gradlew compileJava` - zero compilation errors
+- `./gradlew checkstyleMain` - style compliance
+- `./gradlew test` - all tests pass (JaCoCo coverage)
+
 ### Migration Order
 
 Modules migrated in dependency order:
-1. `tokens.py` → `tokens.rs` (core)
-2. `ast_nodes.py` → `ast.rs` (core)
-3. `errors.py` → `error.rs` (core)
-4. `lexer.py` → `lexer.rs` (pipeline)
-5. `parser.py` → `parser.rs` (pipeline)
-6. `latex_gen.py` → `latex.rs` (pipeline)
-7. `cli.py` → `main.rs` (cli)
+
+| Order | Python Source | Rust Target | Java Target |
+|-------|--------------|-------------|-------------|
+| 1 | tokens.py | tokens.rs | Token.java |
+| 2 | ast_nodes.py | ast.rs | Expr.java |
+| 3 | errors.py | error.rs | RpnException.java |
+| 4 | lexer.py | lexer.rs | Lexer.java |
+| 5 | parser.py | parser.rs | Parser.java |
+| 6 | latex_gen.py | latex.rs | LaTeXGenerator.java |
+| 7 | cli.py | main.rs | Main.java |
 
 ## Results
 
-### Lines of Code
+### Lines of Code Comparison
 
-| Module | Python (LOC) | Rust (LOC) | Expansion |
-|--------|-------------|------------|-----------|
-| tokens | 70 | 180 | 2.6x |
-| ast_nodes | 90 | 370 | 4.1x |
-| errors | 127 | 282 | 2.2x |
-| lexer | 200 | 489 | 2.4x |
-| parser | 183 | 503 | 2.7x |
-| latex_gen | 184 | 442 | 2.4x |
-| cli | 114 | 227 | 2.0x |
-| **Total** | **990** | **2,504** | **2.5x** |
+| Metric | Python | Rust | Java |
+|--------|--------|------|------|
+| Production LOC | 352 | 1,158 | 1,262 |
+| Test LOC | 0 (external) | 1,346 | 2,117 |
+| Total LOC | 352 | 2,504 | 3,379 |
+| Expansion Factor | 1.0x | 3.3x | 3.6x |
+| Production Only Expansion | 1.0x | 3.3x | 3.6x |
 
-Note: LOC expansion is expected when migrating from Python to Rust due to:
-- Explicit type annotations
-- Doc comments on public items
-- Comprehensive test suites
-- Error handling boilerplate
+Note: Rust embeds tests in source files; production LOC excludes `#[cfg(test)]` modules.
+
+### Complexity Metrics
+
+| Metric | Python | Rust | Java |
+|--------|--------|------|------|
+| Production LOC | 352 | 408 | 529 |
+| Function count | 25 | 32 | 42 |
+| Avg cyclomatic complexity | 2.8 | 2.4 | 2.9 |
+| Max cyclomatic complexity | 10 | 7 | 15 |
+
+### Test Coverage
+
+| Language | Line Coverage | Branch Coverage | Unit Tests |
+|----------|--------------|-----------------|------------|
+| Rust | 97.66% | N/A | 72 |
+| Java | 95.87% | 85.2% | 226 |
 
 ### Cost Analysis
 
-| Metric | Value |
-|--------|-------|
-| Total API Cost | $4.47 USD |
-| Cost per 1k Python LOC | $4.52 |
-| Cost per 1k Rust LOC | $1.79 |
-| Messages Processed | 779 |
-| Agent Turns | 28 |
+| Metric | Rust | Java |
+|--------|------|------|
+| Total API Cost | $3.74 | $7.24 |
+| Cost per 1k Source LOC | $10.63 | $20.57 |
+| Messages Processed | ~750 | ~1,200 |
 
-### Workflow Analysis
+Java cost higher due to more verbose language requiring more generation tokens.
 
-The migration log (1,576 lines) reveals a **highly iterative** workflow rather than a linear one.
+### I/O Contract Validation
 
-#### Tool Usage Statistics
+All 21 test inputs produced identical outputs between Python and both target languages:
 
-| Tool | Invocations | Purpose |
-|------|-------------|---------|
-| Read | 131 | Reading source Python and generated Rust files |
-| Bash | 122 | Running cargo commands, find, ls |
-| Glob | 54 | File pattern matching for discovery |
-| Edit | 29 | Fixing compilation errors and clippy warnings |
-| Task | 15 | Spawning analyst/migrator/reviewer subagents |
-| Grep | 15 | Searching for patterns in codebase |
-| Write | 4 | Initial file creation |
+| Input | Expected Output | Rust | Java |
+|-------|----------------|------|------|
+| `5 3 +` | `$5 + 3$` | ✓ | ✓ |
+| `4 7 *` | `$4 \times 7$` | ✓ | ✓ |
+| `5 3 + 2 *` | `$( 5 + 3 ) \times 2$` | ✓ | ✓ |
+| `10 2 /` | `$10 \div 2$` | ✓ | ✓ |
+| `8 3 -` | `$8 - 3$` | ✓ | ✓ |
+| ... | ... | ✓ | ✓ |
+| **Total** | **21/21** | **100%** | **100%** |
 
-#### Build Verification Cycles
+## Key Findings
 
-| Command | Invocations | Notes |
-|---------|-------------|-------|
-| cargo check | 16 | Compilation verification |
-| cargo clippy | 18 | Linter (often re-run after fixes) |
-| cargo fmt | 8 | Formatting |
-| cargo test | 17 | Test execution |
+### 1. Multi-Language Capability Validated
 
-**Total build tool invocations: 59** across 7 modules = ~8.4 per module
+The same four-phase methodology worked for both Rust and Java without modification. Only language-specific configuration (quality gates, idioms, file mappings) differed.
 
-#### Iteration Pattern Analysis
+### 2. I/O Contracts Essential
 
-The workflow exhibited a clear **fix-verify loop**:
+Without explicit I/O contracts, 19% of outputs differed stylistically (e.g., `\times` vs `*`, spacing variations). The I/O contract enforces exact behavioral equivalence.
 
-1. **Write/Edit** code → **cargo check** → errors found → **Edit** → **cargo check** (repeat)
-2. After check passes → **cargo clippy** → warnings found → **Edit** → **cargo clippy** (repeat)
-3. After clippy passes → **cargo fmt** → **cargo test**
+### 3. Quality Gates Enable Self-Correction
 
-Example from parser.rs migration (timestamps from log):
-- 16:52:07 - cargo check (first attempt)
-- 16:52:22 - cargo check (after fix)
-- 16:52:26 - cargo clippy (first attempt)
-- 16:53:01 - cargo clippy (after fix)
-- 16:53:06 - cargo fmt
-- 16:53:16 - cargo test
+The migrator agent exhibited iterative self-correction:
+1. Write code → run quality gate → detect error → fix → re-run
+2. Average 8-10 quality gate invocations per module
+3. 2-4 fix iterations per module on average
 
-This shows **4 cargo invocations** just for build verification on one module, with edits between failed checks.
+### 4. Low Complexity Prerequisite
 
-#### File Discovery Overhead
-
-| Event | Count |
-|-------|-------|
-| "File does not exist" errors | 47 |
-| Path resolution attempts | ~35 |
-
-The agent spent significant effort discovering file locations due to relative path configuration. Early messages (1-100) show extensive searching with `find`, `ls`, and `Glob` before locating source files.
-
-#### Efficiency Metrics
-
-| Metric | Value |
-|--------|-------|
-| Total messages | 779 |
-| Agent turns | 28 |
-| Messages per turn | 27.8 |
-| Subagent invocations | 15 |
-| Edit operations | 29 |
-| Edits per module | 4.1 |
-
-The high message-to-turn ratio (27.8) indicates the agent performed many tool operations per turn, maximizing efficiency within each interaction.
-
-#### Workflow Classification: Iterative
-
-The migration was **predominantly iterative** (not linear):
-
-- **Linear steps**: 7 modules migrated in dependency order
-- **Iterative steps**: Within each module, multiple fix-verify cycles occurred
-- **Ratio**: ~8-10 build verification attempts per module suggests 2-4 fix iterations per module on average
-
-The agent demonstrated **self-correction**: when `cargo check` or `cargo clippy` reported issues, it read the error output, applied fixes via Edit, and re-verified until clean.
-
-### Test Results
-
-```
-running 55 tests
-test result: ok. 55 passed; 0 failed; 0 ignored
-
-Doc-tests rpn2tex
-running 17 tests
-test result: ok. 17 passed; 0 failed; 0 ignored
-```
-
-### Functional Equivalence
-
-All outputs verified identical between Python and Rust:
-
-| Input | Python Output | Rust Output | Match |
-|-------|--------------|-------------|-------|
-| `5 3 +` | `$5 + 3$` | `$5 + 3$` | ✓ |
-| `4 7 *` | `$4 \times 7$` | `$4 \times 7$` | ✓ |
-| `5 3 + 2 *` | `$( 5 + 3 ) \times 2$` | `$( 5 + 3 ) \times 2$` | ✓ |
-| `10 2 /` | `$10 \div 2$` | `$10 \div 2$` | ✓ |
-| `8 3 -` | `$8 - 3$` | `$8 - 3$` | ✓ |
-
-## Observations
+This experiment validated migration on a trivial codebase (avg CC 2.8, no external dependencies). Scaling to medium-complexity codebases requires:
+- Dependency mapping
+- Library equivalence selection
+- Handling of stateful systems
 
 ### What Worked Well
 
-1. **Quality Gate Enforcement**: The migrator agent consistently ran `cargo check`, `cargo clippy`, and `cargo fmt` after each file write, fixing issues iteratively until clean.
-
-2. **Subagent Specialization**: Using Haiku for analysis/review and Sonnet for code generation optimized cost while maintaining quality.
-
-3. **Full Tool Access**: Having Read, Write, Edit, Bash, Glob, and Grep tools allowed the agent to navigate the codebase, run builds, and fix errors autonomously.
-
-4. **Observability**: Adding timestamped logging enabled real-time monitoring of agent progress.
-
-5. **Clean Termination**: The process completed with a proper success status and summary.
+1. **Quality Gate Enforcement**: Migrator consistently ran build/lint/test after each change
+2. **Subagent Specialization**: Haiku for analysis/review, Sonnet for code generation
+3. **Full Tool Access**: Read, Write, Edit, Bash, Glob, Grep enabled autonomous operation
+4. **I/O Contract**: Prevented stylistic drift, enforced exact behavioral equivalence
 
 ### Challenges Encountered
 
-1. **Path Resolution**: Relative paths in configuration caused initial confusion. The agent adapted by using absolute paths via `find` commands.
+1. **Path Resolution**: Relative paths caused initial confusion (fixed with absolute paths)
+2. **Java Verbosity**: More tokens required = higher cost ($7.24 vs $3.74)
+3. **Test Embedding**: Rust inline tests complicated LOC accounting
 
-2. **Source File Discovery**: The agent sometimes searched in wrong directories before finding the correct source files.
+## Framework Architecture
 
-3. **Idle Periods**: Some periods showed 0% CPU usage where the agent appeared stuck but was actually processing or waiting for API responses.
+The migration framework is language-agnostic with self-contained project folders:
 
-### Areas for Improvement
+```
+sdk_migration/
+├── run_migration.py          # CLI: --target rust|java --project projects/rpn2tex
+├── framework/
+│   ├── agents.py             # Language-agnostic agent definitions
+│   ├── runner.py             # Core orchestration logic
+│   └── config.py             # Configuration loading
+├── languages/
+│   ├── base.py               # Abstract LanguageTarget class
+│   ├── rust.py               # Rust-specific configuration
+│   └── java.py               # Java-specific configuration
+├── projects/
+│   └── rpn2tex/              # Self-contained project folder
+│       ├── config.yaml       # Project configuration
+│       ├── source/           # Original Python source (frozen snapshot)
+│       ├── rust/             # Generated Rust project
+│       ├── java/             # Generated Java project
+│       ├── io_contract.json  # I/O contract definition
+│       └── logs/             # Migration logs
+└── docs/
+    └── research/             # Research documentation
+```
 
-1. **Absolute Paths**: Configuration should use absolute paths to avoid resolution issues.
+**Extensibility:**
+- Adding a new target language requires only implementing `LanguageTarget`
+- Adding a new project requires only creating a new project folder with config.yaml
 
-2. **Progress Callbacks**: Real-time progress updates beyond log files would improve UX.
+## Future Work
 
-3. **Incremental Checkpoints**: Saving state after each module would enable resumption on failure.
+### Phase 2: Medium-Complexity Codebase
 
-## Comparison with Previous Approach
+- 5,000-20,000 LOC
+- External dependencies (HTTP clients, databases, etc.)
+- Multiple modules with complex interdependencies
 
-| Aspect | MetaGPT Approach | Claude Agent SDK |
-|--------|------------------|------------------|
-| File Access | No (prompt only) | Yes (Read tool) |
-| Build Tools | Manual subprocess | Yes (Bash tool) |
-| Error Correction | Parse & retry | Interactive loop |
-| Cost Optimization | Single model | Per-agent model |
-| Quality Gates | Manual | Automated |
-| Success Rate | Partial (4/7) | Complete (7/7) |
+### Technical Challenges
+
+- **Dependency Mapping**: Automatic library equivalence selection
+- **Stateful Systems**: Behavioral contracts for systems with side effects
+- **Incremental Migration**: Interoperability between migrated and unmigrated modules
 
 ## Conclusion
 
-The Claude Agent SDK successfully automated a complete Python-to-Rust migration with:
-- **100% module completion** (7/7 modules)
-- **Full functional equivalence** (verified output matching)
-- **Quality enforcement** (all clippy/check/fmt gates passed)
-- **Reasonable cost** ($4.52 per 1k source LOC)
-- **Acceptable duration** (~24 minutes for 990 LOC)
+The Claude Agent SDK successfully automated cross-language code migration to both Rust and Java with:
 
-This demonstrates that LLM-based code migration is viable when agents have:
+- **100% I/O contract match** (21/21 test cases per language)
+- **High test coverage** (97.66% Rust, 95.87% Java)
+- **Quality enforcement** (all lint/check/test gates passed)
+- **Reasonable cost** ($3.74 Rust, $7.24 Java)
+- **Acceptable duration** (~25 minutes per language)
+
+This validates that LLM-based code migration is viable when agents have:
 1. Full file system access
 2. Build tool integration
 3. Iterative error correction capability
 4. Quality gate enforcement
+5. I/O contract validation
 
-## Appendix: File Structure
-
-```
-sdk_migration/
-├── agents.py           # Subagent definitions
-├── run_migration.py    # Orchestrator script
-├── logs/
-│   └── migration_*.log # Timestamped logs
-└── rpn2tex-rs/         # Generated Rust project
-    ├── Cargo.toml
-    └── src/
-        ├── ast.rs      (370 LOC)
-        ├── error.rs    (282 LOC)
-        ├── latex.rs    (442 LOC)
-        ├── lexer.rs    (489 LOC)
-        ├── lib.rs      (11 LOC)
-        ├── main.rs     (227 LOC)
-        ├── parser.rs   (503 LOC)
-        └── tokens.rs   (180 LOC)
-```
+The next phase will test whether these findings scale to medium-complexity codebases with external dependencies.
 
 ---
 
-*Report generated: 2025-12-26*
-*Experiment conducted using Claude Agent SDK with claude-opus-4-5-20251101*
+*Report updated: 2025-12-27*
+*Author: James Freeman, Pembroke College, University of Oxford*
+*Experiments conducted using Claude Agent SDK with claude-opus-4-5-20251101*

@@ -1,0 +1,186 @@
+{
+  "metadata": {
+    "implementation": "Python rpn2tex",
+    "location": "/Users/jfreeman/Coding/rpn2tex/src/rpn2tex/",
+    "test_date": "2025-12-27",
+    "total_test_cases": 21,
+    "cli_entry_point": "rpn2tex.cli",
+    "cli_usage": "python3 -m rpn2tex.cli - < input.txt"
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "input": "5 3 +",
+      "status": "success",
+      "expected_output": "$5 + 3$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 2,
+      "input": "5 3 -",
+      "status": "success",
+      "expected_output": "$5 - 3$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 3,
+      "input": "4 7 *",
+      "status": "success",
+      "expected_output": "$4 \\times 7$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 4,
+      "input": "10 2 /",
+      "status": "success",
+      "expected_output": "$10 \\div 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 5,
+      "input": "2 3 ^",
+      "status": "error",
+      "expected_output": null,
+      "expected_error": "Error: Unexpected character '^'\n\n1 | 2 3 ^\n  |     ^",
+      "exit_code": 1
+    },
+    {
+      "id": 6,
+      "input": "5 3 + 2 *",
+      "status": "success",
+      "expected_output": "$( 5 + 3 ) \\times 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 7,
+      "input": "5 3 * 2 +",
+      "status": "success",
+      "expected_output": "$5 \\times 3 + 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 8,
+      "input": "10 2 / 5 *",
+      "status": "success",
+      "expected_output": "$10 \\div 2 \\times 5$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 9,
+      "input": "5 3 - 2 -",
+      "status": "success",
+      "expected_output": "$5 - 3 - 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 10,
+      "input": "100 10 / 5 / 2 /",
+      "status": "success",
+      "expected_output": "$100 \\div 10 \\div 5 \\div 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 11,
+      "input": "1 2 + 3 + 4 +",
+      "status": "success",
+      "expected_output": "$1 + 2 + 3 + 4$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 12,
+      "input": "2 3 4 * +",
+      "status": "success",
+      "expected_output": "$2 + 3 \\times 4$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 13,
+      "input": "2 3 + 4 *",
+      "status": "success",
+      "expected_output": "$( 2 + 3 ) \\times 4$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 14,
+      "input": "2 3 4 + *",
+      "status": "success",
+      "expected_output": "$2 \\times ( 3 + 4 )$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 15,
+      "input": "2 3 * 4 +",
+      "status": "success",
+      "expected_output": "$2 \\times 3 + 4$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 16,
+      "input": "2 3 ^ 4 *",
+      "status": "error",
+      "expected_output": null,
+      "expected_error": "Error: Unexpected character '^'\n\n1 | 2 3 ^ 4 *\n  |     ^",
+      "exit_code": 1
+    },
+    {
+      "id": 17,
+      "input": "2 3 4 ^ ^",
+      "status": "error",
+      "expected_output": null,
+      "expected_error": "Error: Unexpected character '^'\n\n1 | 2 3 4 ^ ^\n  |       ^",
+      "exit_code": 1
+    },
+    {
+      "id": 18,
+      "input": "3.14 2 *",
+      "status": "success",
+      "expected_output": "$3.14 \\times 2$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 19,
+      "input": "1.5 0.5 +",
+      "status": "success",
+      "expected_output": "$1.5 + 0.5$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 20,
+      "input": "1 2 + 3 4 + *",
+      "status": "success",
+      "expected_output": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "expected_error": null,
+      "exit_code": 0
+    },
+    {
+      "id": 21,
+      "input": "10 2 / 3 + 4 *",
+      "status": "success",
+      "expected_output": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "expected_error": null,
+      "exit_code": 0
+    }
+  ],
+  "summary": {
+    "total": 21,
+    "successful": 18,
+    "errors": 3,
+    "error_rate": "14.3%"
+  }
+}
