@@ -34,6 +34,8 @@
 | Functions | {{ m.source_metrics.function_count }} | {{ m.target_metrics.function_count }} |
 | Avg CC | {{ "%.1f" | format(m.source_metrics.avg_cyclomatic_complexity) }} | {{ "%.1f" | format(m.target_metrics.avg_cyclomatic_complexity) }} |
 | Max CC | {{ m.source_metrics.max_cyclomatic_complexity }} | {{ m.target_metrics.max_cyclomatic_complexity }} |
+| Maintainability Index | {% if m.source_metrics.maintainability_index %}{{ "%.1f" | format(m.source_metrics.maintainability_index) }}{% else %}N/A{% endif %} | {% if m.target_metrics.maintainability_index %}{{ "%.1f" | format(m.target_metrics.maintainability_index) }}{% else %}N/A{% endif %} |
+| External Dependencies | {{ m.source_metrics.external_dependencies }} | {{ m.target_metrics.external_dependencies }} |
 | Expansion | - | {{ "%.2f" | format(m.loc_expansion_ratio) }}x |
 
 ## Token Usage

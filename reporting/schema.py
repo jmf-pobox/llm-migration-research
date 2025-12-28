@@ -126,6 +126,7 @@ class CodeMetrics:
     avg_cyclomatic_complexity: float = 0.0
     max_cyclomatic_complexity: int = 0
     external_dependencies: int = 0
+    maintainability_index: Optional[float] = None  # 0-100, higher is better
 
 
 @dataclass

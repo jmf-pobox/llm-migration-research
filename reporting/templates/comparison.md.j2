@@ -31,6 +31,8 @@
 | Test LOC | {% for r in runs %}{{ r.target_metrics.test_loc | number }} | {% endfor %}
 | Avg CC | {% for r in runs %}{{ "%.1f" | format(r.target_metrics.avg_cyclomatic_complexity) }} | {% endfor %}
 | Max CC | {% for r in runs %}{{ r.target_metrics.max_cyclomatic_complexity }} | {% endfor %}
+| Maintainability Index | {% for r in runs %}{% if r.target_metrics.maintainability_index %}{{ "%.1f" | format(r.target_metrics.maintainability_index) }}{% else %}N/A{% endif %} | {% endfor %}
+| External Dependencies | {% for r in runs %}{{ r.target_metrics.external_dependencies }} | {% endfor %}
 
 ---
 *{{ runs | length }} runs compared*

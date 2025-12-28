@@ -11,6 +11,8 @@ Cost {% for r in runs %}& \${{ "%.2f" | format(r.cost.total_cost_usd) }} {% endf
 Prod.\ LOC {% for r in runs %}& {{ r.target_metrics.production_loc | number }} {% endfor %}\\
 Tests {% for r in runs %}& {{ r.quality_gates.unit_tests.total }} {% endfor %}\\
 Coverage {% for r in runs %}& {% if r.quality_gates.coverage.line_coverage_pct %}{{ "%.0f" | format(r.quality_gates.coverage.line_coverage_pct) }}\%{% else %}N/A{% endif %} {% endfor %}\\
+MI {% for r in runs %}& {% if r.target_metrics.maintainability_index %}{{ "%.0f" | format(r.target_metrics.maintainability_index) }}{% else %}N/A{% endif %} {% endfor %}\\
+Dependencies {% for r in runs %}& {{ r.target_metrics.external_dependencies }} {% endfor %}\\
 I/O Match {% for r in runs %}& {{ "%.0f" | format(r.io_contract.match_rate_pct) }}\% {% endfor %}\\
 \bottomrule
 \end{tabular}

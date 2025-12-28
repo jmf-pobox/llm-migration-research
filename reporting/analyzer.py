@@ -56,6 +56,12 @@ class PostHocAnalyzer:
         py_files = list(source_path.glob("*.py"))
         metrics.module_count = len([f for f in py_files if not f.name.startswith("_")])
 
+        # Calculate Maintainability Index with radon
+        metrics.maintainability_index = self._run_radon_mi(source_path)
+
+        # Count external dependencies
+        metrics.external_dependencies = self._count_python_deps(source_path)
+
         return metrics
 
     def analyze_rust_target(self, target_path: Path) -> CodeMetrics:
@@ -99,6 +105,12 @@ class PostHocAnalyzer:
         if cargo_toml.exists():
             metrics.external_dependencies = self._count_cargo_deps(cargo_toml)
 
+        # Calculate Maintainability Index from collected metrics
+        metrics.maintainability_index = self._calculate_mi_from_metrics(
+            metrics.production_loc,
+            metrics.avg_cyclomatic_complexity,
+        )
+
         return metrics
 
     def analyze_java_target(self, target_path: Path) -> CodeMetrics:
@@ -136,6 +148,15 @@ class PostHocAnalyzer:
         # Count Java files
         java_files = list(src_path.rglob("*.java"))
         metrics.module_count = len(java_files)
+
+        # Count external dependencies from build.gradle or pom.xml
+        metrics.external_dependencies = self._count_java_deps(target_path)
+
+        # Calculate Maintainability Index from collected metrics
+        metrics.maintainability_index = self._calculate_mi_from_metrics(
+            metrics.production_loc,
+            metrics.avg_cyclomatic_complexity,
+        )
 
         return metrics
 
@@ -392,3 +413,109 @@ class PostHocAnalyzer:
             pass
 
         return result
+
+    def _run_radon_mi(self, path: Path) -> Optional[float]:
+        """Run radon mi and return average Maintainability Index."""
+        try:
+            result = subprocess.run(
+                ["radon", "mi", "-s", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                # Parse radon mi output: "filename - A (score)"
+                scores = []
+                for line in result.stdout.strip().split("\n"):
+                    if " - " in line and "(" in line:
+                        # Extract score from parentheses
+                        try:
+                            score_str = line.split("(")[-1].rstrip(")")
+                            scores.append(float(score_str))
+                        except (ValueError, IndexError):
+                            pass
+                if scores:
+                    return sum(scores) / len(scores)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return None
+
+    def _count_python_deps(self, source_path: Path) -> int:
+        """Count Python dependencies from requirements.txt or pyproject.toml."""
+        # Check requirements.txt first
+        req_file = source_path / "requirements.txt"
+        if not req_file.exists():
+            req_file = source_path.parent / "requirements.txt"
+        if req_file.exists():
+            count = 0
+            for line in req_file.read_text().split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#") and not line.startswith("-"):
+                    count += 1
+            return count
+
+        # Check pyproject.toml
+        pyproject = source_path / "pyproject.toml"
+        if not pyproject.exists():
+            pyproject = source_path.parent / "pyproject.toml"
+        if pyproject.exists():
+            content = pyproject.read_text()
+            in_deps = False
+            count = 0
+            for line in content.split("\n"):
+                if "dependencies" in line and "=" in line:
+                    in_deps = True
+                elif line.strip().startswith("[") and in_deps:
+                    break
+                elif in_deps and line.strip().startswith('"'):
+                    count += 1
+            return count
+
+        return 0
+
+    def _count_java_deps(self, target_path: Path) -> int:
+        """Count Java dependencies from build.gradle or pom.xml."""
+        # Check build.gradle
+        gradle_file = target_path / "build.gradle"
+        if gradle_file.exists():
+            content = gradle_file.read_text()
+            # Count implementation/api/compile dependencies
+            import re
+            deps = re.findall(
+                r"(implementation|api|compile|testImplementation)\s*['\"]",
+                content,
+            )
+            return len(deps)
+
+        # Check pom.xml
+        pom_file = target_path / "pom.xml"
+        if pom_file.exists():
+            content = pom_file.read_text()
+            # Count <dependency> tags (excluding test scope)
+            import re
+            deps = re.findall(r"<dependency>", content)
+            return len(deps)
+
+        return 0
+
+    def _calculate_mi_from_metrics(
+        self, loc: int, avg_cc: float
+    ) -> Optional[float]:
+        """Calculate Maintainability Index from LOC and cyclomatic complexity.
+
+        Uses simplified formula: MI = 171 - 5.2*ln(HV) - 0.23*CC - 16.2*ln(LOC)
+        Since we don't have Halstead Volume, we use a simplified version:
+        MI = 171 - 0.23*CC - 16.2*ln(LOC)
+
+        Returns value clamped to 0-100 range.
+        """
+        import math
+
+        if loc <= 0:
+            return None
+
+        # Simplified MI formula (without Halstead Volume)
+        mi = 171 - 0.23 * avg_cc - 16.2 * math.log(loc)
+
+        # Clamp to 0-100 range
+        return max(0.0, min(100.0, mi))

@@ -95,6 +95,8 @@ Every migration automatically captures metrics:
 | Timing | Wall clock, API time, phase durations |
 | Cost | Total USD, token breakdown |
 | Code | LOC, cyclomatic complexity, function count |
+| Maintainability | Maintainability Index (0-100, higher is better) |
+| Dependencies | External third-party dependency count |
 | Quality | Compilation, linting, test results |
 | Coverage | Line, function, and branch coverage percentages |
 | I/O Contract | Test cases passed/failed, match rate |
