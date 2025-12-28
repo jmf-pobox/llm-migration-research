@@ -1,28 +1,22 @@
-# Code Migration Experiment Report
+# Migration Experiment Report
 
-## Project Status: Phase 1 Complete
+## Status
 
-**Completed:** Small-scale migration tested with two target languages (Rust, Java)
-**Next Phase:** Scale to medium-complexity codebase with external dependencies
+**Phase 1 complete:** Tested with trivial codebase, two target languages
+**Next:** Test with larger codebase and external dependencies
 
----
-
-## Summary
-
-We used the Claude Agent SDK to migrate a trivial Python codebase to Rust and Java. The migrations produced working code with 100% behavioral equivalence.
-
-### Results
+## Results
 
 | Metric | Rust | Java |
 |--------|------|------|
 | Duration | ~25 min | ~25 min |
-| Cost | $3.74 USD | $7.24 USD |
-| I/O Match | 100% (21/21) | 100% (21/21) |
+| Cost | $3.74 | $7.24 |
+| I/O Match | 21/21 | 21/21 |
 | Test Coverage | 97.66% | 95.87% |
 
-### Source Codebase
+## Source Codebase
 
-The source was deliberately trivial:
+`rpn2tex` - Python RPN-to-LaTeX converter
 
 | Metric | Value |
 |--------|-------|
@@ -30,76 +24,20 @@ The source was deliberately trivial:
 | Avg Cyclomatic Complexity | 2.8 |
 | External Dependencies | None |
 
-## What We Actually Built
+## Implementation
 
-~500 lines of Python that:
-1. Generates prompts from YAML config
-2. Calls the Claude Agent SDK once
-3. Logs output
+~500 lines of Python:
+- Prompt templates (~250 LOC)
+- SDK call + logging (~260 LOC)
+- CLI and config parsing
 
-```python
-# The entire migration logic:
-async for message in query(prompt=prompt, options=options):
-    log(message)
-```
+The prompt describes:
+- File paths and module order
+- Build commands
+- Test inputs and expected outputs
+- Sub-agent definitions
 
-### Division of Work
-
-| Component | Responsibility |
-|-----------|----------------|
-| Claude Agent SDK | Orchestration, tool execution, retries, state management |
-| Claude Model | Code understanding, generation, reasoning, self-correction |
-| This repo | Prompt templates, config parsing |
-
-The "multi-phase workflow" and "agent coordination" exist in the **prompt text**, not in code. We describe what we want; the SDK and model execute it.
-
-## Methodology
-
-We wrote a prompt describing:
-1. Run source implementation, capture outputs (I/O contract)
-2. Read all source files, produce analysis
-3. Migrate each module, verify outputs match
-4. Review each module
-
-The model interprets this and executes accordingly. There is no orchestration logic on our side.
-
-### Prompt Structure
-
-The prompt includes:
-- Source file paths
-- Target file paths
-- Module dependency order
-- Build commands to run
-- I/O test cases
-
-We also define 4 "agents" (really just prompt templates with different tool access):
-- `io_contract` - Haiku, Bash/Read access
-- `analyst` - Haiku, Read-only access
-- `migrator` - Sonnet, full tool access
-- `reviewer` - Haiku, Read/Bash access
-
-The SDK spawns these as sub-agents when the main prompt requests it.
-
-## Observations
-
-### What Worked
-
-1. **I/O contracts** - Pre-capturing expected outputs helped ensure behavioral equivalence
-2. **Structured prompts** - Describing phases gave more predictable results than unstructured requests
-3. **Quality gates in prompt** - Including build commands in the prompt caused the model to run them
-
-### What We Learned
-
-1. The SDK handles everything - our "framework" is just prompt generation
-2. Trivial codebases (no dependencies, low complexity) migrate successfully
-3. Cost scales with output verbosity (Java cost 2x Rust)
-
-### Limitations
-
-- Only tested on 352 LOC with no dependencies
-- No actual orchestration - relies entirely on SDK/model behavior
-- Cannot handle codebases larger than context window
-- No error recovery beyond SDK defaults
+The Claude Agent SDK handles execution.
 
 ## Complexity Metrics
 
@@ -108,29 +46,24 @@ The SDK spawns these as sub-agents when the main prompt requests it.
 | Production LOC | 352 | 408 | 529 |
 | Function count | 25 | 32 | 42 |
 | Avg cyclomatic complexity | 2.8 | 2.4 | 2.9 |
-| Max cyclomatic complexity | 10 | 7 | 15 |
 
-## File Structure
+## Observations
 
-```
-sdk_migration/
-├── run_migration.py          # CLI wrapper
-├── framework/
-│   ├── agents.py             # Prompt templates
-│   ├── runner.py             # SDK call + logging
-│   └── config.py             # YAML parsing
-├── languages/                # Build command configs
-└── projects/rpn2tex/         # Source and outputs
-```
+1. Pre-capturing expected outputs (I/O contract) helped ensure behavioral equivalence
+2. Structured prompts gave more predictable results than unstructured
+3. Embedding source in prompts increased latency 4x
 
-## Future Work
+## Limitations
 
-Test whether this approach works for:
-- Larger codebases (5,000-20,000 LOC)
-- External dependencies
-- Stateful systems
+- Trivial codebase (352 LOC, no dependencies)
+- 21 test cases
+- Single source language (Python)
+
+## Next Steps
+
+Test with larger codebases that have external dependencies.
 
 ---
 
-*Report updated: 2025-12-28*
-*Author: James Freeman, Pembroke College, University of Oxford*
+*December 2025*
+*James Freeman, Pembroke College, University of Oxford*

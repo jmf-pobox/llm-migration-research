@@ -1,82 +1,52 @@
-# Code Migration Experiment with Claude Agent SDK
+# Code Migration with Claude Agent SDK
 
-An experiment in using the Claude Agent SDK for cross-language code migration.
+Cross-language code migration using the Claude Agent SDK.
 
-## Project Status: Phase 1 Complete
+## Status
 
-**Completed:** Small-scale migration tested with two target languages (Rust, Java)
-**Next Phase:** Scale to medium-complexity codebase with external dependencies
-
-## What This Project Is
-
-This is a **prompt engineering experiment**, not a framework. We wrote ~500 lines of Python that:
-
-1. Generates structured prompts describing a migration task
-2. Passes those prompts to the Claude Agent SDK
-3. Logs the output
-
-The Claude Agent SDK and the underlying Claude model do all the actual work: reading files, generating code, running build tools, fixing errors, and coordinating the workflow.
-
-### What We Built vs. What Anthropic Built
-
-| Component | Who Built It | What It Does |
-|-----------|--------------|--------------|
-| Claude Agent SDK | Anthropic | Orchestration, tool execution, error handling, retries |
-| Claude Model | Anthropic | Code understanding, generation, reasoning |
-| This repo | Us | Prompt templates, YAML config parsing, CLI wrapper |
+**Phase 1 complete:** Tested with trivial codebase (352 LOC), two target languages (Rust, Java)
+**Next:** Test with larger codebase and external dependencies
 
 ## Results
 
-We migrated `rpn2tex` (a trivial 352-LOC Python codebase) to Rust and Java:
+Migrated `rpn2tex` (Python RPN-to-LaTeX converter) to Rust and Java:
 
 | Metric | Rust | Java |
 |--------|------|------|
 | Duration | ~25 min | ~25 min |
-| Cost | $3.74 USD | $7.24 USD |
-| I/O Match | 100% (21/21) | 100% (21/21) |
+| Cost | $3.74 | $7.24 |
+| I/O Match | 21/21 | 21/21 |
 | Test Coverage | 97.66% | 95.87% |
 
-### Source Codebase Complexity
-
-The source was deliberately trivial:
-
-| Metric | Value |
-|--------|-------|
-| Production LOC | 352 |
-| Avg Cyclomatic Complexity | 2.8 |
-| External Dependencies | None |
+Source complexity: 352 LOC, avg cyclomatic complexity 2.8, no external dependencies.
 
 ## How It Works
 
-We send one prompt to the Claude Agent SDK describing what we want:
+The CLI generates a prompt describing the migration task and passes it to the Claude Agent SDK. The prompt describes:
+- Source and target file paths
+- Module dependency order
+- Build commands to run
+- Test inputs and expected outputs
+- Sub-agent definitions (different tool permissions)
 
-```
-"Migrate this Python codebase to Rust. First run the source to capture
-expected outputs. Then analyze all files. Then migrate each module and
-verify outputs match. Use these agents: io_contract, analyst, migrator,
-reviewer..."
-```
-
-The SDK and model handle everything else. The "4-phase workflow" and "agent coordination" exist in the prompt text - we describe what we want, the model figures out how to do it.
-
-### The Entire "Orchestration"
+The SDK and model handle execution.
 
 ```python
 async for message in query(prompt=prompt, options=options):
     log(message)
 ```
 
-## Project Structure
+## Structure
 
 ```
 sdk_migration/
-├── run_migration.py          # CLI (~180 LOC)
+├── run_migration.py      # CLI
 ├── framework/
-│   ├── agents.py             # Prompt templates (~250 LOC)
-│   ├── runner.py             # SDK call + logging (~260 LOC)
-│   └── config.py             # YAML parsing
-├── languages/                # Config strings (file extensions, build commands)
-└── projects/rpn2tex/         # Test project with source and outputs
+│   ├── agents.py         # Prompt templates
+│   ├── runner.py         # SDK call + logging
+│   └── config.py         # YAML parsing
+├── languages/            # Target language configs
+└── projects/rpn2tex/     # Source and outputs
 ```
 
 ## Usage
@@ -89,26 +59,17 @@ python run_migration.py --target rust --project projects/rpn2tex
 python run_migration.py --target java --project projects/rpn2tex
 ```
 
-## Findings
+## Observations
 
-1. **I/O contracts help** - Pre-capturing expected outputs prevents stylistic drift
-2. **Prompt structure matters** - Describing phases in the prompt improved results
-3. **Trivial codebases work** - No external dependencies, low complexity
-4. **The SDK does the work** - Our contribution is prompt engineering
+- Pre-capturing expected outputs (I/O contract) helped ensure behavioral equivalence
+- Structured prompts (describing phases) gave more predictable results
+- Embedding source in prompts made things slower (4x) and more expensive
 
 ## Limitations
 
-- Only tested on trivial codebase (352 LOC, no dependencies)
-- No actual orchestration logic - relies entirely on SDK/model
-- No error recovery beyond what the SDK provides
-- Cannot handle codebases the model can't fit in context
-
-## Future Work
-
-Test whether this approach scales to:
-- Larger codebases (5,000-20,000 LOC)
-- External dependencies requiring library mapping
-- Stateful systems with side effects
+- Only tested on trivial codebase
+- No external dependencies in test case
+- 21 test cases, not exhaustive
 
 ## License
 

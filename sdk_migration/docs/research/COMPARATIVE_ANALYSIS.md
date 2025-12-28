@@ -158,14 +158,10 @@ Full list: 18 valid expressions, 3 error cases.
 
 ---
 
-## Honest Assessment
+## Next Steps
 
-This experiment showed that the Claude Agent SDK can migrate trivial code when given good prompts. Our contribution was writing prompts and observing results.
-
-The "four-phase methodology" is just a description in a prompt. The "agent architecture" is just different tool permissions. The "framework" is ~500 LOC of prompt generation.
-
-Whether this approach scales to real codebases is unknown.
+Test with larger codebases that have external dependencies.
 
 ---
 
-*Notes updated: December 2025*
+*December 2025*
