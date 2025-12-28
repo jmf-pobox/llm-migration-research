@@ -1,0 +1,126 @@
+================================================================================
+                    rpn2tex I/O CONTRACT - QUICK REFERENCE
+================================================================================
+
+TEST RESULTS
+  Total: 20  |  Passing: 17 (85%)  |  Not Supported: 3  |  Errors: 0
+
+PASSING TEST CASES (17/20)
+================================================================================
+
+Numbers (2/2)
+  "5"              -> "$5$"
+  "3.14"           -> "$3.14$"
+
+Addition (2/2)
+  "5 3 +"          -> "$5 + 3$"
+  "1 2 + 3 + 4 +"  -> "$1 + 2 + 3 + 4$"
+
+Subtraction (2/2)
+  "5 3 -"          -> "$5 - 3$"
+  "5 3 - 2 -"      -> "$5 - 3 - 2$"
+
+Multiplication (3/3)
+  "4 7 *"          -> "$4 \times 7$"
+  "2 3 4 * +"      -> "$2 + 3 \times 4$"
+  "3.14 2 *"       -> "$3.14 \times 2$"
+
+Division (2/2)
+  "10 2 /"         -> "$10 \div 2$"
+  "100 10 / 5 / 2 /" -> "$100 \div 10 \div 5 \div 2$"
+
+Precedence (5/5)
+  "5 3 + 2 *"      -> "$( 5 + 3 ) \times 2$"
+  "2 3 + 4 *"      -> "$( 2 + 3 ) \times 4$"
+  "2 3 4 + *"      -> "$2 \times ( 3 + 4 )$"
+  "1 2 + 3 4 + *"  -> "$( 1 + 2 ) \times ( 3 + 4 )$"
+  "10 2 / 3 + 4 *" -> "$( 10 \div 2 + 3 ) \times 4$"
+
+Decimals (2/2)
+  "1.5 0.5 +"      -> "$1.5 + 0.5$"
+  "3.14 2 *"       -> "$3.14 \times 2$"
+
+NOT SUPPORTED (3/3) - Exponentiation operator (^) not implemented
+================================================================================
+  "2 3 ^"          -> Error: Unexpected character '^'
+  "2 3 4 ^ ^"      -> Error: Unexpected character '^'
+  "2 3 ^ 4 *"      -> Error: Unexpected character '^'
+
+OUTPUT FORMAT
+================================================================================
+  Pattern: $<LaTeX expression>$
+  
+  Operator Symbols:
+    Addition:       " + "
+    Subtraction:    " - "
+    Multiplication: " \times "
+    Division:       " \div "
+    
+  Rules:
+    - Wrap in $...$ (LaTeX inline math mode)
+    - Single space around all binary operators
+    - Parentheses only when needed for precedence
+    - No trailing whitespace
+
+SUPPORTED FEATURES
+================================================================================
+  ✓ Single numbers (integers and decimals)
+  ✓ Binary operators: +, -, *, /
+  ✓ Operator precedence with automatic parenthesization
+  ✓ Multi-operand expressions
+  ✓ Error reporting with line/column information
+
+NOT SUPPORTED
+================================================================================
+  ✗ Exponentiation operator (^)
+  ✗ Square root function (sqrt)
+  ✗ Nth root function (root)
+
+IMPLEMENTATION LOCATION
+================================================================================
+  Python Source: /Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/
+                 projects/rpn2tex/source/
+  
+  Key Files:
+    cli.py           - Command-line interface
+    lexer.py         - Tokenization
+    parser.py        - RPN parsing
+    latex_gen.py     - LaTeX generation
+
+HOW TO RUN TESTS
+================================================================================
+  From stdin:
+    echo "5 3 +" | python projects/rpn2tex/source/cli.py -
+  
+  From file:
+    python projects/rpn2tex/source/cli.py input.rpn
+  
+  With output file:
+    python projects/rpn2tex/source/cli.py input.rpn -o output.tex
+
+DOCUMENTATION FILES
+================================================================================
+  README_IO_CONTRACT.md       - Navigation guide (start here)
+  I_O_CONTRACT_SUMMARY.md     - Executive summary
+  IO_CONTRACT.md              - Detailed specification
+  VERIFIED_TEST_CASES.md      - Per-test documentation
+  io_contract.json            - Machine-readable contract
+  PHASE_0_COMPLETION_REPORT.md - Completion report
+
+QUICK START FOR RUST IMPLEMENTATION
+================================================================================
+  1. Read: I_O_CONTRACT_SUMMARY.md
+  2. Reference: io_contract.json (test oracle)
+  3. Run: All 20 tests and compare outputs
+  4. Verify: 17 tests pass, 3 error gracefully
+  5. Check: Output matches exactly (spaces, symbols, wrapping)
+
+VERIFICATION STATUS
+================================================================================
+  Date Completed: 2025-12-28
+  All Tests Run: YES
+  All Outputs Captured: YES
+  Documentation Complete: YES
+  Ready for Migration: YES
+
+================================================================================

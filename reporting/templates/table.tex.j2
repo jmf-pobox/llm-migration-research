@@ -1,0 +1,16 @@
+\begin{table}[h]
+\centering
+\caption{{ '{' }}{{ caption }}{{ '}' }}
+\label{{ '{' }}{{ label }}{{ '}' }}
+\begin{tabular}{@{}l{% for r in runs %}r{% endfor %}@{}}
+\toprule
+Metric {% for r in runs %}& {{ r.identity.strategy | replace("_", "-") }} {% endfor %}\\
+\midrule
+Duration {% for r in runs %}& {{ (r.timing.wall_clock_duration_ms / 60000) | round(0) | int }} min {% endfor %}\\
+Cost {% for r in runs %}& \${{ "%.2f" | format(r.cost.total_cost_usd) }} {% endfor %}\\
+Prod.\ LOC {% for r in runs %}& {{ r.target_metrics.production_loc | number }} {% endfor %}\\
+Tests {% for r in runs %}& {{ r.quality_gates.unit_tests.total }} {% endfor %}\\
+I/O Match {% for r in runs %}& {{ "%.0f" | format(r.io_contract.match_rate_pct) }}\% {% endfor %}\\
+\bottomrule
+\end{tabular}
+\end{table}

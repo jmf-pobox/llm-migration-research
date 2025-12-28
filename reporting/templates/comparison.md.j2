@@ -1,0 +1,35 @@
+# {{ title }}
+
+**Generated:** {{ generated_at }}
+
+## Overview
+
+| Metric | {% for r in runs %}{{ r.identity.strategy }} | {% endfor %}
+|--------|{% for r in runs %}--------|{% endfor %}
+| Duration | {% for r in runs %}{{ r.timing.wall_clock_duration_ms | duration }} | {% endfor %}
+| Cost | {% for r in runs %}{{ r.cost.total_cost_usd | cost }} | {% endfor %}
+| Prod LOC | {% for r in runs %}{{ r.target_metrics.production_loc | number }} | {% endfor %}
+| Tests | {% for r in runs %}{{ r.quality_gates.unit_tests.total }} | {% endfor %}
+| I/O Match | {% for r in runs %}{{ r.io_contract.match_rate_pct | pct }} | {% endfor %}
+| Status | {% for r in runs %}{{ r.outcome.status }} | {% endfor %}
+
+## Token Usage
+
+| Metric | {% for r in runs %}{{ r.identity.strategy }} | {% endfor %}
+|--------|{% for r in runs %}--------|{% endfor %}
+| Input | {% for r in runs %}{{ r.tokens.input_tokens | number }} | {% endfor %}
+| Output | {% for r in runs %}{{ r.tokens.output_tokens | number }} | {% endfor %}
+| Cache Create | {% for r in runs %}{{ r.tokens.cache_creation_input_tokens | number }} | {% endfor %}
+| Cache Read | {% for r in runs %}{{ r.tokens.cache_read_input_tokens | number }} | {% endfor %}
+
+## Code Metrics
+
+| Metric | {% for r in runs %}{{ r.identity.strategy }} | {% endfor %}
+|--------|{% for r in runs %}--------|{% endfor %}
+| Prod LOC | {% for r in runs %}{{ r.target_metrics.production_loc | number }} | {% endfor %}
+| Test LOC | {% for r in runs %}{{ r.target_metrics.test_loc | number }} | {% endfor %}
+| Avg CC | {% for r in runs %}{{ "%.1f" | format(r.target_metrics.avg_cyclomatic_complexity) }} | {% endfor %}
+| Max CC | {% for r in runs %}{{ r.target_metrics.max_cyclomatic_complexity }} | {% endfor %}
+
+---
+*{{ runs | length }} runs compared*

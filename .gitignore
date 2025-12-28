@@ -1,7 +1,10 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*.so
+.Python
+*.egg-info/
+.eggs/
 .venv/
 venv/
 
@@ -9,8 +12,13 @@ venv/
 target/
 Cargo.lock
 
-# Logs
-sdk_migration/logs/
+# Java
+.gradle/
+build/
+*.class
+
+# Database
+migrations.db
 
 # IDE
 .idea/
@@ -19,3 +27,18 @@ sdk_migration/logs/
 
 # OS
 .DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+
+# Keep PDF outputs
+!*.pdf

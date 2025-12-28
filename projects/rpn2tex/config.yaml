@@ -1,0 +1,196 @@
+name: rpn2tex
+description: RPN (Reverse Polish Notation) to LaTeX converter
+
+source:
+  language: python
+  directory: source  # Relative to project root
+  original_repo: https://github.com/jfreeman/rpn2tex  # Reference to original
+  files:
+    - tokens.py
+    - ast_nodes.py
+    - errors.py
+    - lexer.py
+    - parser.py
+    - latex_gen.py
+    - cli.py
+
+modules:
+  - name: tokens
+    source: tokens.py
+    phase: core
+    description: Token type definitions and Token class
+
+  - name: ast
+    source: ast_nodes.py
+    phase: core
+    description: AST node definitions (Expr enum with Number and BinaryOp)
+
+  - name: errors
+    source: errors.py
+    phase: core
+    description: Error formatting with line/column display
+
+  - name: lexer
+    source: lexer.py
+    phase: pipeline
+    depends_on: [tokens, errors]
+    description: Tokenizer that converts input string to token stream
+
+  - name: parser
+    source: parser.py
+    phase: pipeline
+    depends_on: [tokens, ast, errors]
+    description: Stack-based RPN parser producing AST
+
+  - name: latex
+    source: latex_gen.py
+    phase: pipeline
+    depends_on: [ast]
+    description: LaTeX code generator with precedence-aware parenthesization
+
+  - name: cli
+    source: cli.py
+    phase: cli
+    depends_on: [lexer, parser, latex, errors]
+    description: Command-line interface with file and stdin support
+
+test_inputs:
+  # Basic operators
+  - "5 3 +"
+  - "5 3 -"
+  - "4 7 *"
+  - "10 2 /"
+  # Unsupported operator (error case)
+  - "2 3 ^"
+  # Compound expressions
+  - "5 3 + 2 *"
+  - "5 3 * 2 +"
+  - "10 2 / 5 *"
+  # Left-associative chains
+  - "5 3 - 2 -"
+  - "100 10 / 5 / 2 /"
+  - "1 2 + 3 + 4 +"
+  # Precedence edge cases
+  - "2 3 4 * +"
+  - "2 3 + 4 *"
+  - "2 3 4 + *"
+  - "2 3 * 4 +"
+  # More error cases
+  - "2 3 ^ 4 *"
+  - "2 3 4 ^ ^"
+  # Decimals
+  - "3.14 2 *"
+  - "1.5 0.5 +"
+  # Complex nested
+  - "1 2 + 3 4 + *"
+  - "10 2 / 3 + 4 *"
+
+# Feature slices for feature-by-feature migration strategy
+# Each feature cuts across multiple modules (lexer, parser, generator)
+features:
+  - name: numbers
+    description: Parse and output numeric literals
+    touches: [tokens.py, ast_nodes.py, lexer.py, parser.py, latex_gen.py]
+    test_cases:
+      - input: "5"
+        output: "$5$"
+      - input: "3.14"
+        output: "$3.14$"
+
+  - name: addition
+    description: Addition operator (+)
+    depends_on: [numbers]
+    touches: [tokens.py, lexer.py, parser.py, latex_gen.py]
+    test_cases:
+      - input: "5 3 +"
+        output: "$5 + 3$"
+      - input: "1 2 + 3 + 4 +"
+        output: "$1 + 2 + 3 + 4$"
+
+  - name: subtraction
+    description: Subtraction operator (-)
+    depends_on: [numbers]
+    touches: [tokens.py, lexer.py, parser.py, latex_gen.py]
+    test_cases:
+      - input: "5 3 -"
+        output: "$5 - 3$"
+      - input: "5 3 - 2 -"
+        output: "$5 - 3 - 2$"
+
+  - name: multiplication
+    description: Multiplication operator (*)
+    depends_on: [numbers]
+    touches: [tokens.py, lexer.py, parser.py, latex_gen.py]
+    test_cases:
+      - input: "4 7 *"
+        output: "$4 \\times 7$"
+      - input: "2 3 4 * +"
+        output: "$2 + 3 \\times 4$"
+
+  - name: division
+    description: Division operator (/)
+    depends_on: [numbers]
+    touches: [tokens.py, lexer.py, parser.py, latex_gen.py]
+    test_cases:
+      - input: "10 2 /"
+        output: "$10 \\div 2$"
+      - input: "100 10 / 5 / 2 /"
+        output: "$100 \\div 10 \\div 5 \\div 2$"
+
+  - name: precedence
+    description: Precedence handling and parenthesization
+    depends_on: [addition, subtraction, multiplication, division]
+    touches: [latex_gen.py]
+    test_cases:
+      - input: "5 3 + 2 *"
+        output: "$( 5 + 3 ) \\times 2$"
+      - input: "2 3 + 4 *"
+        output: "$( 2 + 3 ) \\times 4$"
+      - input: "2 3 4 + *"
+        output: "$2 \\times ( 3 + 4 )$"
+      - input: "1 2 + 3 4 + *"
+        output: "$( 1 + 2 ) \\times ( 3 + 4 )$"
+      - input: "10 2 / 3 + 4 *"
+        output: "$( 10 \\div 2 + 3 ) \\times 4$"
+
+targets:
+  rust:
+    directory: rust
+    status: complete
+    coverage: 97.66%
+  java:
+    directory: java
+    status: complete
+    coverage: 95.87%
+
+io_contract:
+  command_template: |
+    cd {project_dir}/source && PYTHONPATH=. python -c "from cli import main; import sys; sys.argv = ['rpn2tex', '-']; main()" <<< "{input}"
+
+  # Pre-generated expected outputs (from Python implementation)
+  # These are used for validation - migration MUST match these exactly
+  expected_outputs:
+    "5 3 +": "$5 + 3$"
+    "5 3 -": "$5 - 3$"
+    "4 7 *": "$4 \\times 7$"
+    "10 2 /": "$10 \\div 2$"
+    "5 3 + 2 *": "$( 5 + 3 ) \\times 2$"
+    "5 3 * 2 +": "$5 \\times 3 + 2$"
+    "10 2 / 5 *": "$10 \\div 2 \\times 5$"
+    "5 3 - 2 -": "$5 - 3 - 2$"
+    "100 10 / 5 / 2 /": "$100 \\div 10 \\div 5 \\div 2$"
+    "1 2 + 3 + 4 +": "$1 + 2 + 3 + 4$"
+    "2 3 4 * +": "$2 + 3 \\times 4$"
+    "2 3 + 4 *": "$( 2 + 3 ) \\times 4$"
+    "2 3 4 + *": "$2 \\times ( 3 + 4 )$"
+    "2 3 * 4 +": "$2 \\times 3 + 4$"
+    "3.14 2 *": "$3.14 \\times 2$"
+    "1.5 0.5 +": "$1.5 + 0.5$"
+    "1 2 + 3 4 + *": "$( 1 + 2 ) \\times ( 3 + 4 )$"
+    "10 2 / 3 + 4 *": "$( 10 \\div 2 + 3 ) \\times 4$"
+
+  # Error cases - these should produce errors, not output
+  error_inputs:
+    - "2 3 ^"
+    - "2 3 ^ 4 *"
+    - "2 3 4 ^ ^"

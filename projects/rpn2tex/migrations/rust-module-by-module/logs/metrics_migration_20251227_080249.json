@@ -1,0 +1,117 @@
+{
+  "identity": {
+    "run_id": "18de320a-8603-4c89-a28b-69bb353b1689",
+    "project_name": "rpn2tex",
+    "source_language": "python",
+    "target_language": "unknown",
+    "strategy": "module-by-module",
+    "started_at": "2025-12-27T08:02:49",
+    "completed_at": "2025-12-28T09:11:17.190252",
+    "host_platform": null,
+    "sdk_version": null,
+    "model_id": null
+  },
+  "timing": {
+    "wall_clock_duration_ms": 2373604,
+    "api_duration_ms": 2675367,
+    "phase_durations_ms": {},
+    "module_durations": []
+  },
+  "cost": {
+    "total_cost_usd": 7.201041200000001,
+    "input_tokens_cost_usd": 0.0,
+    "output_tokens_cost_usd": 0.0,
+    "cache_creation_cost_usd": 0.0
+  },
+  "tokens": {
+    "input_tokens": 24,
+    "output_tokens": 0,
+    "cache_creation_input_tokens": 236995,
+    "cache_read_input_tokens": 1426860,
+    "cache_efficiency_ratio": 0.9999831801323723
+  },
+  "agent": {
+    "total_turns": 29,
+    "total_messages": 673,
+    "subagent_invocations": {},
+    "tool_invocations": {
+      "Task": 10,
+      "Read": 88,
+      "Bash": 160,
+      "Glob": 3,
+      "Write": 20,
+      "Grep": 2,
+      "Edit": 34,
+      "TodoWrite": 7
+    },
+    "error_recovery_events": 0,
+    "retry_count": 0
+  },
+  "source_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0
+  },
+  "target_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0
+  },
+  "quality_gates": {
+    "compilation": {
+      "passed": false,
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "linting": {
+      "passed": false,
+      "tool": "",
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "formatting": {
+      "passed": false,
+      "tool": ""
+    },
+    "unit_tests": {
+      "passed": false,
+      "total": 0,
+      "passed_count": 0,
+      "failed_count": 0,
+      "skipped_count": 0
+    },
+    "coverage": {
+      "line_coverage_pct": null,
+      "function_coverage_pct": null,
+      "branch_coverage_pct": null
+    }
+  },
+  "io_contract": {
+    "total_test_cases": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "feature_results": [],
+    "match_rate_pct": 0.0
+  },
+  "outcome": {
+    "status": "success",
+    "modules_completed": 0,
+    "modules_total": 0,
+    "blocking_issues": [],
+    "notes": null
+  },
+  "schema_version": "1.0.0",
+  "loc_expansion_ratio": 0.0,
+  "cost_per_loc": 0.0
+}

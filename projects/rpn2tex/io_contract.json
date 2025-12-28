@@ -1,0 +1,243 @@
+{
+  "metadata": {
+    "project": "rpn2tex",
+    "implementation": "Python",
+    "generated": "2025-12-28",
+    "cli_entry_point": "python projects/rpn2tex/source/cli.py",
+    "source_location": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/"
+  },
+  "summary": {
+    "total_test_cases": 20,
+    "passing": 17,
+    "unsupported": 3,
+    "errors": 0,
+    "success_rate_percent": 85
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "feature": "numbers",
+      "input": "5",
+      "expected_output": "$5$",
+      "actual_output": "$5$",
+      "status": "PASS"
+    },
+    {
+      "id": 2,
+      "feature": "numbers",
+      "input": "3.14",
+      "expected_output": "$3.14$",
+      "actual_output": "$3.14$",
+      "status": "PASS"
+    },
+    {
+      "id": 3,
+      "feature": "addition",
+      "input": "5 3 +",
+      "expected_output": "$5 + 3$",
+      "actual_output": "$5 + 3$",
+      "status": "PASS"
+    },
+    {
+      "id": 4,
+      "feature": "addition",
+      "input": "1 2 + 3 + 4 +",
+      "expected_output": "$1 + 2 + 3 + 4$",
+      "actual_output": "$1 + 2 + 3 + 4$",
+      "status": "PASS"
+    },
+    {
+      "id": 5,
+      "feature": "subtraction",
+      "input": "5 3 -",
+      "expected_output": "$5 - 3$",
+      "actual_output": "$5 - 3$",
+      "status": "PASS"
+    },
+    {
+      "id": 6,
+      "feature": "subtraction",
+      "input": "5 3 - 2 -",
+      "expected_output": "$5 - 3 - 2$",
+      "actual_output": "$5 - 3 - 2$",
+      "status": "PASS"
+    },
+    {
+      "id": 7,
+      "feature": "multiplication",
+      "input": "4 7 *",
+      "expected_output": "$4 \\times 7$",
+      "actual_output": "$4 \\times 7$",
+      "status": "PASS"
+    },
+    {
+      "id": 8,
+      "feature": "multiplication",
+      "input": "2 3 4 * +",
+      "expected_output": "$2 + 3 \\times 4$",
+      "actual_output": "$2 + 3 \\times 4$",
+      "status": "PASS"
+    },
+    {
+      "id": 9,
+      "feature": "division",
+      "input": "10 2 /",
+      "expected_output": "$10 \\div 2$",
+      "actual_output": "$10 \\div 2$",
+      "status": "PASS"
+    },
+    {
+      "id": 10,
+      "feature": "division",
+      "input": "100 10 / 5 / 2 /",
+      "expected_output": "$100 \\div 10 \\div 5 \\div 2$",
+      "actual_output": "$100 \\div 10 \\div 5 \\div 2$",
+      "status": "PASS"
+    },
+    {
+      "id": 11,
+      "feature": "precedence",
+      "input": "5 3 + 2 *",
+      "expected_output": "$( 5 + 3 ) \\times 2$",
+      "actual_output": "$( 5 + 3 ) \\times 2$",
+      "status": "PASS"
+    },
+    {
+      "id": 12,
+      "feature": "precedence",
+      "input": "2 3 + 4 *",
+      "expected_output": "$( 2 + 3 ) \\times 4$",
+      "actual_output": "$( 2 + 3 ) \\times 4$",
+      "status": "PASS"
+    },
+    {
+      "id": 13,
+      "feature": "precedence",
+      "input": "2 3 4 + *",
+      "expected_output": "$2 \\times ( 3 + 4 )$",
+      "actual_output": "$2 \\times ( 3 + 4 )$",
+      "status": "PASS"
+    },
+    {
+      "id": 14,
+      "feature": "precedence",
+      "input": "1 2 + 3 4 + *",
+      "expected_output": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "actual_output": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "status": "PASS"
+    },
+    {
+      "id": 15,
+      "feature": "precedence",
+      "input": "10 2 / 3 + 4 *",
+      "expected_output": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "actual_output": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "status": "PASS"
+    },
+    {
+      "id": 16,
+      "feature": "decimals",
+      "input": "3.14 2 *",
+      "expected_output": "$3.14 \\times 2$",
+      "actual_output": "$3.14 \\times 2$",
+      "status": "PASS"
+    },
+    {
+      "id": 17,
+      "feature": "decimals",
+      "input": "1.5 0.5 +",
+      "expected_output": "$1.5 + 0.5$",
+      "actual_output": "$1.5 + 0.5$",
+      "status": "PASS"
+    },
+    {
+      "id": 18,
+      "feature": "exponentiation",
+      "input": "2 3 ^",
+      "expected_output": null,
+      "actual_output": "Error: Unexpected character '^' at Line 1, column 5",
+      "status": "NOT_SUPPORTED",
+      "note": "Caret operator (^) is not implemented in current version"
+    },
+    {
+      "id": 19,
+      "feature": "exponentiation",
+      "input": "2 3 4 ^ ^",
+      "expected_output": null,
+      "actual_output": "Error: Unexpected character '^' at Line 1, column 7",
+      "status": "NOT_SUPPORTED",
+      "note": "Caret operator (^) is not implemented in current version"
+    },
+    {
+      "id": 20,
+      "feature": "exponentiation",
+      "input": "2 3 ^ 4 *",
+      "expected_output": null,
+      "actual_output": "Error: Unexpected character '^' at Line 1, column 5",
+      "status": "NOT_SUPPORTED",
+      "note": "Caret operator (^) is not implemented in current version"
+    }
+  ],
+  "features": {
+    "numbers": {
+      "status": "SUPPORTED",
+      "test_count": 2,
+      "passing": 2
+    },
+    "addition": {
+      "status": "SUPPORTED",
+      "test_count": 2,
+      "passing": 2
+    },
+    "subtraction": {
+      "status": "SUPPORTED",
+      "test_count": 2,
+      "passing": 2
+    },
+    "multiplication": {
+      "status": "SUPPORTED",
+      "test_count": 3,
+      "passing": 3
+    },
+    "division": {
+      "status": "SUPPORTED",
+      "test_count": 2,
+      "passing": 2
+    },
+    "precedence": {
+      "status": "SUPPORTED",
+      "test_count": 5,
+      "passing": 5
+    },
+    "decimals": {
+      "status": "SUPPORTED",
+      "test_count": 2,
+      "passing": 2
+    },
+    "exponentiation": {
+      "status": "NOT_SUPPORTED",
+      "test_count": 3,
+      "passing": 0,
+      "note": "Caret (^) operator not implemented"
+    }
+  },
+  "output_format": {
+    "pattern": "$<LaTeX expression>$",
+    "math_mode": "inline",
+    "operators": {
+      "addition": " + ",
+      "subtraction": " - ",
+      "multiplication": " \\times ",
+      "division": " \\div "
+    },
+    "spacing": "Single space around all binary operators",
+    "parentheses": "Added only when needed for precedence"
+  },
+  "implementation_files": {
+    "cli": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/cli.py",
+    "lexer": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/lexer.py",
+    "parser": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/parser.py",
+    "latex_gen": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/latex_gen.py",
+    "tokens": "/Users/jfreeman/Coding/rpn2tex-rust-migration/sdk_migration/projects/rpn2tex/source/tokens.py"
+  }
+}
