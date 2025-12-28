@@ -15,24 +15,25 @@
 | Total Cost | {{ total_stats.total_cost_usd | cost }} |
 | Avg Cost | {{ total_stats.avg_cost_usd | cost }} |
 | Avg I/O Match | {{ total_stats.avg_io_match_rate | pct }} |
+| Avg Coverage | {% if total_stats.avg_coverage_pct %}{{ total_stats.avg_coverage_pct | pct }}{% else %}N/A{% endif %} |
 | Success Rate | {{ total_stats.success_rate_pct | pct }} |
 | Avg LOC Expansion | {{ "%.2f" | format(total_stats.avg_loc_expansion) }}x |
 {% endif %}
 
 ## By Target Language
 
-| Target | Count | Avg Duration | Avg Cost | Success Rate |
-|--------|-------|--------------|----------|--------------|
+| Target | Count | Avg Duration | Avg Cost | Avg Coverage | Success Rate |
+|--------|-------|--------------|----------|--------------|--------------|
 {% for target, stats in by_target.items() %}
-| {{ target }} | {{ stats.count }} | {{ stats.avg_duration_ms | duration }} | {{ stats.avg_cost_usd | cost }} | {{ stats.success_rate_pct | pct }} |
+| {{ target }} | {{ stats.count }} | {{ stats.avg_duration_ms | duration }} | {{ stats.avg_cost_usd | cost }} | {% if stats.avg_coverage_pct %}{{ stats.avg_coverage_pct | pct }}{% else %}N/A{% endif %} | {{ stats.success_rate_pct | pct }} |
 {% endfor %}
 
 ## By Strategy
 
-| Strategy | Count | Avg Duration | Avg Cost | Success Rate |
-|----------|-------|--------------|----------|--------------|
+| Strategy | Count | Avg Duration | Avg Cost | Avg Coverage | Success Rate |
+|----------|-------|--------------|----------|--------------|--------------|
 {% for strat, stats in by_strategy.items() %}
-| {{ strat }} | {{ stats.count }} | {{ stats.avg_duration_ms | duration }} | {{ stats.avg_cost_usd | cost }} | {{ stats.success_rate_pct | pct }} |
+| {{ strat }} | {{ stats.count }} | {{ stats.avg_duration_ms | duration }} | {{ stats.avg_cost_usd | cost }} | {% if stats.avg_coverage_pct %}{{ stats.avg_coverage_pct | pct }}{% else %}N/A{% endif %} | {{ stats.success_rate_pct | pct }} |
 {% endfor %}
 
 ## Projects

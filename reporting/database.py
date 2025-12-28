@@ -29,6 +29,7 @@ class AggregateStats:
     avg_io_match_rate: float
     success_rate_pct: float
     avg_loc_expansion: float
+    avg_coverage_pct: Optional[float] = None
 
 
 class MigrationDatabase:
@@ -58,6 +59,7 @@ class MigrationDatabase:
         duration_ms INTEGER,
         cost_usd REAL,
         io_match_rate REAL,
+        line_coverage_pct REAL,
         status TEXT,
         source_loc INTEGER,
         target_loc INTEGER,
@@ -72,6 +74,10 @@ class MigrationDatabase:
     CREATE INDEX IF NOT EXISTS idx_status ON migrations(status);
     """
 
+    MIGRATION_V2 = """
+    ALTER TABLE migrations ADD COLUMN line_coverage_pct REAL;
+    """
+
     def __init__(self, db_path: Path = DEFAULT_DB_PATH):
         self.db_path = db_path
         self._init_db()
@@ -80,6 +86,19 @@ class MigrationDatabase:
         """Initialize database schema."""
         with self._connect() as conn:
             conn.executescript(self.SCHEMA)
+            # Run migrations for existing databases
+            self._run_migrations(conn)
+
+    def _run_migrations(self, conn: sqlite3.Connection) -> None:
+        """Run schema migrations for existing databases."""
+        # Check if line_coverage_pct column exists
+        cursor = conn.execute("PRAGMA table_info(migrations)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "line_coverage_pct" not in columns:
+            try:
+                conn.execute(self.MIGRATION_V2)
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -100,8 +119,8 @@ class MigrationDatabase:
                 INSERT OR REPLACE INTO migrations (
                     run_id, project_name, source_language, target_language,
                     strategy, started_at, completed_at, duration_ms, cost_usd,
-                    io_match_rate, status, source_loc, target_loc, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    io_match_rate, line_coverage_pct, status, source_loc, target_loc, metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     metrics.identity.run_id,
@@ -114,6 +133,7 @@ class MigrationDatabase:
                     metrics.timing.wall_clock_duration_ms,
                     metrics.cost.total_cost_usd,
                     metrics.io_contract.match_rate_pct,
+                    metrics.quality_gates.coverage.line_coverage_pct,
                     metrics.outcome.status,
                     metrics.source_metrics.production_loc,
                     metrics.target_metrics.production_loc,
@@ -213,6 +233,7 @@ class MigrationDatabase:
                     SUM(cost_usd) as total_cost_usd,
                     AVG(cost_usd) as avg_cost_usd,
                     AVG(io_match_rate) as avg_io_match_rate,
+                    AVG(line_coverage_pct) as avg_coverage_pct,
                     AVG(CASE WHEN status = 'success' THEN 1.0 ELSE 0.0 END) * 100 as success_rate_pct,
                     AVG(CAST(target_loc AS REAL) / NULLIF(source_loc, 0)) as avg_loc_expansion
                 FROM migrations
@@ -248,6 +269,7 @@ class MigrationDatabase:
                 avg_io_match_rate=row["avg_io_match_rate"] or 0,
                 success_rate_pct=row["success_rate_pct"] or 0,
                 avg_loc_expansion=row["avg_loc_expansion"] or 0,
+                avg_coverage_pct=row["avg_coverage_pct"],
             )
 
     def _percentile(self, values: list[int], percentile: int) -> float:

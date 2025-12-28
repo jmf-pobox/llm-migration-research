@@ -10,6 +10,7 @@
 | Cost | {% for r in runs %}{{ r.cost.total_cost_usd | cost }} | {% endfor %}
 | Prod LOC | {% for r in runs %}{{ r.target_metrics.production_loc | number }} | {% endfor %}
 | Tests | {% for r in runs %}{{ r.quality_gates.unit_tests.total }} | {% endfor %}
+| Coverage | {% for r in runs %}{% if r.quality_gates.coverage.line_coverage_pct %}{{ r.quality_gates.coverage.line_coverage_pct | pct }}{% else %}N/A{% endif %} | {% endfor %}
 | I/O Match | {% for r in runs %}{{ r.io_contract.match_rate_pct | pct }} | {% endfor %}
 | Status | {% for r in runs %}{{ r.outcome.status }} | {% endfor %}
 

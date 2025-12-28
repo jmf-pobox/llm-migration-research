@@ -96,6 +96,7 @@ Every migration automatically captures metrics:
 | Cost | Total USD, token breakdown |
 | Code | LOC, cyclomatic complexity, function count |
 | Quality | Compilation, linting, test results |
+| Coverage | Line, function, and branch coverage percentages |
 | I/O Contract | Test cases passed/failed, match rate |
 
 Query and export with the reporting CLI:
