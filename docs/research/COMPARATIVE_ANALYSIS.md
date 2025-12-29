@@ -7,13 +7,13 @@
 
 ## What This Document Is
 
-Notes from experiments using the Claude Agent SDK to migrate a trivial Python codebase to Rust and Java. This is not a framework or methodology - it's observations from prompt engineering experiments.
+Notes from experiments using the Claude Agent SDK to migrate a trivial Python codebase to Rust, Java, and Go. This is not a framework or methodology - it's observations from prompt engineering experiments.
 
 ---
 
 ## Summary
 
-We wrote prompts describing a migration task and passed them to the Claude Agent SDK. The SDK and model did the actual work. Both migrations produced working code with 100% behavioral equivalence on our test set.
+We wrote prompts describing a migration task and passed them to the Claude Agent SDK. The SDK and model did the actual work. All migrations produced working code with 100% behavioral equivalence on our test set.
 
 | Target | Strategy | Duration | Cost | I/O Match |
 |--------|----------|----------|------|-----------|
@@ -21,8 +21,10 @@ We wrote prompts describing a migration task and passed them to the Claude Agent
 | Rust | Feature-by-feature | ~32 min | $4.63 | 100% (21/21) |
 | Java | Module-by-module | ~26 min | $4.92 | 100% (21/21) |
 | Java | Feature-by-feature | ~51 min | $6.27 | 100% (21/21) |
+| Go | Module-by-module | ~29 min | $6.85 | 100% (21/21) |
+| Go | Feature-by-feature | ~32 min | $5.60 | 100% (21/21) |
 
-**Key finding:** Strategy efficiency varies by target language. For Rust, feature-by-feature saves ~30%. For Java, module-by-module saves ~22%.
+**Key finding:** Strategy efficiency varies by target language. For Rust and Go, feature-by-feature saves ~18-30%. For Java, module-by-module saves ~22%.
 
 ### What We Built
 
@@ -106,20 +108,48 @@ The model figures out how to execute this. We don't implement any orchestration 
 
 ## Code Metrics
 
-| Metric | Python | Rust | Java |
-|--------|--------|------|------|
-| Production LOC | 352 | 408 | 529 |
-| Function count | 25 | 32 | 42 |
-| Avg cyclomatic complexity | 2.8 | 2.4 | 2.9 |
+| Metric | Python | Rust | Java | Go |
+|--------|--------|------|------|-----|
+| Production LOC | 352 | 579 | 368 | 781 |
+| Function count | 25 | 38 | 31 | 42 |
+| Avg cyclomatic complexity | 2.8 | 2.4 | 2.9 | 2.6 |
 
 ---
 
 ## Test Coverage
 
-| Language | Line Coverage | Tests |
-|----------|--------------|-------|
-| Rust | 97.66% | 93 |
-| Java | 95.87% | 226 |
+| Language | Strategy | Line Coverage | Tests |
+|----------|----------|--------------|-------|
+| Rust | Mod-by-mod | 96.9% | 24 |
+| Rust | Feat-by-feat | 84.9% | 19 |
+| Go | Mod-by-mod | 83.8% | 230 |
+| Go | Feat-by-feat | 74.1% | 125 |
+| Java | Mod-by-mod | --- | 0 |
+| Java | Feat-by-feat | 72.0% | 50 |
+
+**Notes:**
+- Rust: Measured via cargo-llvm-cov; test counts are doctests
+- Go: Built-in coverage reporting via `go test -cover`
+- Java MbM: Standalone demo programs, not JUnit tests (no coverage possible)
+- Java FbF: Measured via JaCoCo
+
+---
+
+## Tool Invocations
+
+| Target | Strategy | Bash | Read | Write | Edit |
+|--------|----------|------|------|-------|------|
+| Rust | Mod-by-mod | 301 | 134 | 18 | 46 |
+| Rust | Feat-by-feat | 191 | 100 | 10 | 33 |
+| Java | Mod-by-mod | 268 | 99 | 21 | 5 |
+| Java | Feat-by-feat | 235 | 153 | 23 | 25 |
+| Go | Mod-by-mod | 255 | 114 | 34 | 9 |
+| Go | Feat-by-feat | 110 | 80 | 16 | 41 |
+
+**Observations:**
+- Module-by-module uses more Bash invocations (avg 275 vs 179)
+- Feature-by-feature shows higher Edit-to-Write ratios in some cases
+- Go feature-by-feature notably efficient (110 Bash calls)
 
 ---
 
@@ -244,18 +274,34 @@ Feature-by-feature: $100 \div 10 \div 5 \div 2$
 | Subagent calls | 16 | 14 |
 | I/O Contract Match | 100% | 100% |
 
+### Go Results (December 2025)
+
+| Metric | Module-by-Module | Feature-by-Feature |
+|--------|------------------|-------------------|
+| Duration (wall clock) | ~29 min | ~32 min |
+| Cost | $6.85 | $5.60 |
+| Messages | 918 | 581 |
+| API time | 57 min | 34 min |
+| Subagent calls | 16 | 9 |
+| I/O Contract Match | 100% | 100% |
+| Production LOC | 781 | 613 |
+| Test Coverage | 83.8% | 74.1% |
+| Tests | 230 | 125 |
+
 ### Key Finding: Strategy Efficiency Varies by Target
 
 | Target | Better Strategy | Cost Savings |
 |--------|-----------------|--------------|
 | Rust | Feature-by-feature | ~30% |
 | Java | Module-by-module | ~22% |
+| Go | Feature-by-feature | ~18% |
 
-The reversal suggests:
+The pattern suggests:
 - **Rust**: Feature-by-feature benefits from Rust's module system and cargo's incremental compilation
+- **Go**: Feature-by-feature benefits from Go's flat package structure and fast compilation
 - **Java**: Module-by-module benefits from Java's class-based structure where complete classes are easier to verify
 
-### Both Strategies Work
+### All Strategies Work
 
 Regardless of which is more efficient, both strategies reliably produce:
 - Working code that compiles
@@ -269,9 +315,10 @@ The cost difference is optimization, not correctness.
 ## Next Steps
 
 1. ~~Run both strategies on Java target for comparison~~ ✓ Done
-2. Apply strategies to txt2tex (~10k LOC) to test scaling
-3. Validate with external dependencies
-4. Investigate why strategy efficiency varies by target language
+2. ~~Run both strategies on Go target for comparison~~ ✓ Done
+3. Apply strategies to txt2tex (~10k LOC) to test scaling
+4. Validate with external dependencies
+5. Investigate why strategy efficiency varies by target language
 
 ---
 

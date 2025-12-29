@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     id 'checkstyle'
+    id 'jacoco'
 }
 
 group = 'com.rpn2tex'
@@ -37,4 +38,12 @@ checkstyle {
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }

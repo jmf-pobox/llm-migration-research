@@ -19,6 +19,8 @@ from .schema import (
     AgentMetrics,
     ModuleTiming,
     OutcomeMetrics,
+    QualityGates,
+    CoverageResult,
 )
 
 
@@ -68,6 +70,7 @@ class MetricsCollector:
         self.tokens = TokenMetrics()
         self.agent = AgentMetrics()
         self.outcome = OutcomeMetrics()
+        self.quality_gates = QualityGates()
 
         # Internal tracking
         self._phase_start_times: dict[str, float] = {}
@@ -127,6 +130,18 @@ class MetricsCollector:
     def record_retry(self) -> None:
         """Record a retry attempt."""
         self.agent.retry_count += 1
+
+    def record_coverage(self, line_coverage: float | None) -> None:
+        """Record test coverage percentage.
+
+        Args:
+            line_coverage: Line coverage percentage (0-100), or None if unavailable
+        """
+        self.quality_gates.coverage = CoverageResult(
+            line_coverage_pct=line_coverage,
+            function_coverage_pct=None,
+            branch_coverage_pct=None,
+        )
 
     def record_result(self, result: Any) -> None:
         """Record the final ResultMessage from the SDK.
@@ -213,6 +228,7 @@ class MetricsCollector:
             tokens=self.tokens,
             agent=self.agent,
             outcome=self.outcome,
+            quality_gates=self.quality_gates,
         )
 
 

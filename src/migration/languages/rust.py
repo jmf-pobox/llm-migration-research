@@ -54,6 +54,17 @@ Apply these patterns to pass clippy on first attempt:
    - Implement `std::error::Error` and `Display` for error types
    - Use `Result<T, E>` for fallible operations
    - Use `Option<T>` for optional values
+
+6. **Testing (REQUIRED)**:
+   - Write unit tests in `#[cfg(test)]` modules within each source file
+   - Test all public functions
+   - Use `#[test]` attribute for test functions
+   - Include doc tests with `///` examples that are runnable
+
+7. **Coverage setup**:
+   - Install cargo-llvm-cov: `cargo install cargo-llvm-cov`
+   - Ensure llvm-tools-preview is installed: `rustup component add llvm-tools-preview`
+   - Test coverage can be measured with: `cargo llvm-cov --text`
 """
 
     def get_reviewer_checks(self) -> str:
@@ -87,3 +98,28 @@ Apply these patterns to pass clippy on first attempt:
 
     def get_source_dir(self, project_dir: str) -> str:
         return f"{project_dir}/src"
+
+    def get_coverage_command(self, project_dir: str) -> str:
+        # Use cargo-llvm-cov with explicit paths to llvm tools
+        # Falls back to tarpaulin if llvm-cov unavailable
+        return f"""cd {project_dir} && (
+            LLVM_COV=$HOME/.rustup/toolchains/stable-*/lib/rustlib/*/bin/llvm-cov
+            LLVM_PROFDATA=$HOME/.rustup/toolchains/stable-*/lib/rustlib/*/bin/llvm-profdata
+            export LLVM_COV=$(ls $LLVM_COV 2>/dev/null | head -1)
+            export LLVM_PROFDATA=$(ls $LLVM_PROFDATA 2>/dev/null | head -1)
+            cargo llvm-cov 2>/dev/null || cargo tarpaulin --out Stdout 2>/dev/null || echo 'coverage tool not available'
+        )"""
+
+    def parse_coverage_output(self, output: str) -> float | None:
+        import re
+        # cargo-llvm-cov format: "TOTAL  XX.XX%"
+        # tarpaulin format: "XX.XX% coverage"
+        patterns = [
+            r"TOTAL\s+[\d.]+%\s+[\d.]+%\s+([\d.]+)%",  # llvm-cov
+            r"(\d+\.?\d*)%\s*coverage",  # tarpaulin
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, output)
+            if match:
+                return float(match.group(1))
+        return None

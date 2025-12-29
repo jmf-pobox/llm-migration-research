@@ -67,6 +67,25 @@ Apply these patterns for modern, idiomatic Java (17+):
    - Use interface types (List, Map, Set) not implementations
    - Prefer immutable collections (List.of(), Map.of())
    - Use Stream API for transformations
+
+8. **Testing (REQUIRED)**:
+   - Create JUnit 5 tests in `src/test/java/` for EVERY source class
+   - Test class naming: `FooTest.java` for `Foo.java`
+   - Test all public methods
+   - Use `@Test` annotation for test methods
+   - Use `@ParameterizedTest` for I/O contract test cases
+
+9. **Coverage setup**:
+   - Add JaCoCo plugin to build.gradle:
+     ```
+     plugins {
+         id 'jacoco'
+     }
+     jacocoTestReport {
+         dependsOn test
+     }
+     ```
+   - Run coverage with: `./gradlew test jacocoTestReport`
 """
 
     def get_reviewer_checks(self) -> str:
@@ -104,3 +123,15 @@ Apply these patterns for modern, idiomatic Java (17+):
 
     def get_source_dir(self, project_dir: str) -> str:
         return f"{project_dir}/src/main/java/com/rpn2tex"
+
+    def get_coverage_command(self, project_dir: str) -> str:
+        # Use JaCoCo via Gradle - requires jacoco plugin configured
+        return f"cd {project_dir} && ./gradlew test jacocoTestReport 2>/dev/null && grep -o '[0-9]*%' build/reports/jacoco/test/html/index.html 2>/dev/null | head -1 || echo 'coverage not available'"
+
+    def parse_coverage_output(self, output: str) -> float | None:
+        import re
+        # JaCoCo HTML output contains percentage like "95%"
+        match = re.search(r"(\d+)%", output)
+        if match:
+            return float(match.group(1))
+        return None

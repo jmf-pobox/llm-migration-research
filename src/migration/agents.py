@@ -161,6 +161,19 @@ You will receive:
 {quality_gates}
 ```
 
+## Test Generation (Required)
+
+You MUST generate unit tests for the migrated code:
+1. Create tests in the standard location for the target language
+2. Test all public functions and methods
+3. Include edge cases from the I/O contract as test cases
+4. Tests must pass before proceeding
+
+For test file locations:
+- Rust: `src/*.rs` with `#[cfg(test)]` modules or `tests/*.rs`
+- Java: `src/test/java/` with JUnit 5
+- Go: `*_test.go` files alongside source
+
 ## I/O Contract Validation (Critical)
 
 The migration spec includes an I/O contract with expected input/output pairs.
@@ -170,7 +183,7 @@ After migration:
 3. Compare outputs EXACTLY with expected values
 4. If outputs differ, ADJUST the implementation to match the source's behavior
 
-Only report success when ALL quality gates pass AND I/O contract is satisfied.""",
+Only report success when ALL quality gates pass AND I/O contract is satisfied AND tests are generated.""",
         "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
         "model": "sonnet",
     }
@@ -214,6 +227,11 @@ You will receive:
 ### Behavioral Correctness
 <any concerns about logic>
 
+### Test Coverage
+- [ ] Unit tests exist for this module
+- [ ] Tests cover public API
+- [ ] Tests include I/O contract cases
+
 ### I/O Contract Compliance
 - [ ] Tested all I/O contract inputs
 - [ ] All outputs match expected values exactly
@@ -224,6 +242,8 @@ You will receive:
 ### Verdict
 PASS / FAIL with summary
 ```
+
+**CRITICAL**: If no unit tests exist for the migrated module, the review MUST FAIL.
 
 ### Output Location
 Write the review report to: {project_dir}/artifacts/PHASE_3_REVIEW.md

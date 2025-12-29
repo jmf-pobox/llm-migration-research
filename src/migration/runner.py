@@ -1,5 +1,6 @@
 """Core migration orchestration logic."""
 
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +14,48 @@ if TYPE_CHECKING:
     from .strategies.base import MigrationStrategy
     from .reporting.collector import MetricsCollector
     from .reporting.database import MigrationDatabase
+
+
+def measure_coverage(
+    target: LanguageTarget, project_dir: str, log_file: Path | None = None
+) -> float | None:
+    """Measure test coverage for the migrated project.
+
+    Args:
+        target: Target language configuration
+        project_dir: Path to the migrated project
+        log_file: Optional log file for output
+
+    Returns:
+        Coverage percentage (0-100) or None if measurement failed
+    """
+    coverage_cmd = target.get_coverage_command(project_dir)
+    if not coverage_cmd:
+        log("Coverage measurement not configured for this target", log_file)
+        return None
+
+    log(f"Measuring coverage: {coverage_cmd[:80]}...", log_file)
+    try:
+        result = subprocess.run(
+            coverage_cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout
+        )
+        output = result.stdout + result.stderr
+        coverage = target.parse_coverage_output(output)
+        if coverage is not None:
+            log(f"Coverage: {coverage:.1f}%", log_file)
+        else:
+            log("Could not parse coverage from output", log_file)
+        return coverage
+    except subprocess.TimeoutExpired:
+        log("Coverage measurement timed out", log_file)
+        return None
+    except Exception as e:
+        log(f"Coverage measurement failed: {e}", log_file)
+        return None
 
 
 def log(msg: str, log_file: Path | None = None, also_print: bool = True) -> None:
@@ -319,6 +362,13 @@ async def run_migration(
     log("Next steps:", log_file)
     for i, cmd in enumerate(target.get_quality_gates(), 1):
         log(f"{i}. Run: {cmd}", log_file)
+
+    # Measure coverage after migration
+    if collector:
+        log("", log_file)
+        log("Measuring test coverage...", log_file)
+        coverage = measure_coverage(target, project_dir, log_file)
+        collector.record_coverage(coverage)
 
     # Finalize and save metrics
     if collector:

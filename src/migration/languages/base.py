@@ -101,3 +101,44 @@ class LanguageTarget(ABC):
             Path to source directory (e.g., 'src' for Rust, 'src/main/java/...' for Java)
         """
         pass
+
+    @abstractmethod
+    def get_coverage_command(self, project_dir: str) -> str:
+        """Return shell command to measure test coverage.
+
+        The command should output coverage percentage in a parseable format.
+        The framework will parse for patterns like "XX.XX% coverage" or "Coverage: XX.XX%".
+
+        Args:
+            project_dir: Absolute path to the project directory
+
+        Returns:
+            Shell command string, or empty string if coverage not supported
+        """
+        pass
+
+    def parse_coverage_output(self, output: str) -> float | None:
+        """Parse coverage percentage from command output.
+
+        Override this method for language-specific parsing.
+        Default implementation looks for common patterns.
+
+        Args:
+            output: stdout/stderr from coverage command
+
+        Returns:
+            Coverage percentage (0-100) or None if not parseable
+        """
+        import re
+        # Common patterns: "92.5% coverage", "Coverage: 92.5%", "92.5%"
+        patterns = [
+            r"(\d+\.?\d*)%\s*coverage",
+            r"coverage[:\s]+(\d+\.?\d*)%",
+            r"(\d+\.?\d*)%\s*of\s*statements",
+            r"line[:\s]+(\d+\.?\d*)%",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                return float(match.group(1))
+        return None

@@ -3,10 +3,12 @@
 from .base import LanguageTarget
 from .rust import RustTarget
 from .java import JavaTarget
+from .go import GoTarget
 
 LANGUAGE_REGISTRY: dict[str, type[LanguageTarget]] = {
     "rust": RustTarget,
     "java": JavaTarget,
+    "go": GoTarget,
 }
 
 
@@ -18,4 +20,4 @@ def get_language_target(name: str) -> LanguageTarget:
     return LANGUAGE_REGISTRY[name]()
 
 
-__all__ = ["LanguageTarget", "RustTarget", "JavaTarget", "get_language_target"]
+__all__ = ["LanguageTarget", "RustTarget", "JavaTarget", "GoTarget", "get_language_target", "LANGUAGE_REGISTRY"]
