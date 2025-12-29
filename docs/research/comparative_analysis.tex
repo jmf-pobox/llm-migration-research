@@ -87,27 +87,30 @@ We deliberately selected a \textit{trivial} subject system to establish baseline
 \item \textbf{Comprehensive testability}: Input-output behavior is easily captured and verified.
 \end{itemize}
 
-\subsubsection{Complexity Metrics}
+\subsubsection{Code Metrics}
 
-To quantify the system's complexity, we measured cyclomatic complexity using \texttt{lizard}, a multi-language code complexity analyzer. Table~\ref{tab:complexity} presents consistent metrics across all three implementations.
+Table~\ref{tab:complexity} presents production code metrics across all implementations, measured using line counts excluding test code.
 
 \begin{table}[h]
 \centering
-\caption{Complexity metrics across implementations}
+\caption{Production code metrics (excluding tests)}
 \label{tab:complexity}
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}llrr@{}}
 \toprule
-Metric & Python & Rust & Java \\
+Target & Strategy & LOC & Funcs \\
 \midrule
-Prod.\ LOC & 352 & 408 & 529 \\
-Functions & 25 & 32 & 42 \\
-Avg CC & 2.8 & 2.4 & 2.9 \\
-Max CC & 10 & 7 & 15 \\
+Python & (source) & 352 & 25 \\
+\midrule
+Rust & Mod-by-mod & 579 & 38 \\
+Rust & Feat-by-feat & 549 & 33 \\
+\midrule
+Java & Mod-by-mod & 368 & 31 \\
+Java & Feat-by-feat & 389 & 32 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All three implementations exhibit low cyclomatic complexity, with averages below 3.0. The maximum complexity in any single function is 15 (Java's \texttt{Parser.parse}), which remains in the ``moderate'' range. For reference, a typical ``medium complexity'' codebase has average CC of 5--10, and ``high complexity'' systems exceed 15. The subject system's metrics confirm its classification as ``trivial'' from a complexity standpoint.
+Both migration strategies produced similar amounts of production code for each target language. Rust migrations expanded from 352 to approximately 560 LOC (1.6x), while Java migrations expanded to approximately 380 LOC (1.1x). The higher expansion ratio for Rust likely reflects explicit type annotations, pattern matching, and Result-based error handling.
 
 These characteristics represent a best-case scenario for automated migration. The research question is not whether this particular system can be migrated---it clearly can---but whether the methodology that succeeds here generalizes to other target languages and, eventually, to more complex systems.
 
@@ -155,30 +158,27 @@ We measured wall-clock duration, API cost in US dollars, production lines of cod
 
 \subsection{Migration Outcomes}
 
-We performed migrations to two structurally different target languages: Rust (a systems language with ownership semantics and no garbage collection) and Java (a managed language with garbage collection). Both migrations achieved 100\% behavioral equivalence on the 21-case I/O contract. Table~\ref{tab:multilang} summarizes the results.
+We performed migrations to two structurally different target languages: Rust (a systems language with ownership semantics and no garbage collection) and Java (a managed language with garbage collection). We tested both module-by-module and feature-by-feature strategies for each target. All migrations achieved 100\% behavioral equivalence on the 21-case I/O contract. Table~\ref{tab:multilang} summarizes the results.
 
 \begin{table}[h]
 \centering
-\caption{Multi-language migration comparison}
+\caption{Migration results by target and strategy}
 \label{tab:multilang}
-\begin{tabular}{@{}lcc@{}}
+\begin{tabular}{@{}llrrr@{}}
 \toprule
-Metric & Rust & Java \\
+Target & Strategy & Dur. & Cost & Msgs \\
 \midrule
-Duration & 25 min & 25 min \\
-Cost & \$3.74 & \$7.24 \\
-Prod.\ LOC & 1,158 & 1,262 \\
-Test LOC & 1,346 & 2,580 \\
-Tests & 93 & 226 \\
-Line cov. & 97.7\% & 95.9\% \\
-I/O match & 100\% & 100\% \\
+Rust & Mod-by-mod & 32m & \$6.53 & 937 \\
+Rust & Feat-by-feat & 32m & \$4.63 & 742 \\
+Java & Mod-by-mod & 26m & \$4.92 & 871 \\
+Java & Feat-by-feat & 51m & \$6.27 & 1026 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The Java migration cost approximately 2x more than Rust despite similar duration. This difference is attributable to the larger volume of generated test code (2,580 lines versus 1,346 lines) and additional iterations for Checkstyle compliance.
+All four migrations achieved 100\% I/O contract match. The observed cost and duration differences between strategies varied by target language: for Rust, feature-by-feature was less expensive; for Java, module-by-module was less expensive.
 
-Both languages achieved comparable code expansion (1.2--1.3x) and coverage metrics, demonstrating that the methodology produces consistent quality across structurally different target languages. The successful Java migration validates that our four-phase approach is not Rust-specific but genuinely language-agnostic.
+\textbf{Limitations of single-run observations}: Each configuration was executed once. The migration process involves non-deterministic model behavior, and observed differences may reflect run-to-run variance rather than systematic strategy effects. Establishing statistically significant conclusions about strategy efficiency would require 5--10 runs per configuration to characterize the distribution of outcomes.
 
 \section{Discussion}
 
@@ -204,35 +204,42 @@ We evaluated two migration strategies on the same subject system: \textit{module
 
 \textbf{Feature-by-feature} migrates horizontal slices across all modules. Each feature (e.g., ``addition operator'') is migrated through lexer, parser, and generator before proceeding to the next feature. This strategy enables incremental I/O validation per feature.
 
-Table~\ref{tab:strategy} compares the two strategies for Rust migration.
+Table~\ref{tab:strategy} presents observed metrics for both strategies across target languages.
 
 \begin{table}[h]
 \centering
-\caption{Migration strategy comparison (Rust)}
+\caption{Strategy comparison by target language}
 \label{tab:strategy}
-\begin{tabular}{@{}lrr@{}}
+\begin{tabular}{@{}llrrr@{}}
 \toprule
-Metric & Mod-by-Mod & Feat-by-Feat \\
+Target & Strategy & Cost & API & Msgs \\
 \midrule
-Duration & 25 min & 43 min \\
-Prod.\ LOC & 1,184 & 931 \\
-Test LOC & 1,346 & 126 \\
-Tests & 93 & 51 \\
-Ext.\ deps & 2 & 0 \\
-I/O match & 100\% & 100\% \\
+Rust & Mod-by-mod & \$6.53 & 55m & 937 \\
+Rust & Feat-by-feat & \$4.63 & 33m & 742 \\
+Java & Mod-by-mod & \$4.92 & 45m & 871 \\
+Java & Feat-by-feat & \$6.27 & 54m & 1026 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Both strategies produced byte-identical output for all test cases. The 21\% production code difference is attributable to coding style choices (module-by-module used external crates for CLI parsing and error handling), not the migration strategy itself. Feature-by-feature took 72\% longer (43 vs 25 minutes) due to incremental I/O validation after each feature slice.
+Both strategies produced identical output for all test cases regardless of target language. The observed pattern---feature-by-feature appearing more efficient for Rust while module-by-module appearing more efficient for Java---may reflect genuine differences in how each strategy interacts with target language characteristics, or may reflect run-to-run variance in non-deterministic model behavior.
 
-For trivial codebases, both strategies are viable. Feature-by-feature is recommended for larger codebases where high-complexity functions benefit from incremental feature isolation and per-feature I/O validation.
+We note several possible explanations for the observed differences, though none are confirmed:
+\begin{itemize}
+\item Rust's module system and cargo's incremental compilation may favor feature-by-feature's iterative approach
+\item Java's class-based structure may align better with module-by-module's complete-class-at-a-time approach
+\item The specific test cases and error recovery paths encountered in each run vary non-deterministically
+\end{itemize}
 
-\subsection{Cost Model}
+Both strategies reliably produce correct output. For this trivial codebase, strategy selection does not affect correctness, only cost and duration.
 
-Based on our experiments, we propose a cost model for LLM-based migration. For a codebase of similar complexity to our subject system, expect costs of \$3.50 to \$5.00 per thousand lines of source code. Duration scales approximately linearly with module count at 3 to 10 minutes per module. Build verification cycles average 8 to 10 per module as agents iteratively fix compilation errors and linter warnings.
+\subsection{Cost Observations}
 
-These costs compare favorably to manual migration effort while providing guarantees through quality gates and behavioral contracts that manual migration typically lacks.
+Across all four migrations (two targets, two strategies), observed costs ranged from \$4.63 to \$6.53, with durations from 26 to 51 minutes. For this 990-line source codebase, this corresponds to approximately \$4.70 to \$6.60 per thousand lines of source code.
+
+These observations derive from single runs per configuration. The non-deterministic nature of LLM-based migration means individual runs may vary. To establish reliable cost estimates, multiple runs per configuration would be necessary to characterize the distribution.
+
+We note that all runs completed successfully with 100\% I/O contract match, suggesting the methodology is reliable for correctness even if cost varies between runs.
 
 \subsection{Scope Characterization and Limitations}
 
@@ -275,9 +282,9 @@ Our subject system, \texttt{rpn2tex}, is deliberately trivial: under 1,000 lines
 
 The validated methodology provides a foundation for scaling research. Key questions for future investigation include:
 
-\textbf{Medium-complexity codebases}: How does the methodology perform on systems in the 5,000--20,000 LOC range with external dependencies? Our next target is \texttt{txt2tex}, a 9,300 LOC Python codebase with average cyclomatic complexity of 6.7 and maximum complexity of 40. The feature-by-feature strategy is expected to handle this complexity better than module-by-module due to its incremental validation approach.
+\textbf{Medium-complexity codebases}: How does the methodology perform on systems in the 5,000--20,000 LOC range with external dependencies? Our next target is \texttt{txt2tex}, a 9,300 LOC Python codebase with average cyclomatic complexity of 6.7 and maximum complexity of 40. At this scale, the relative performance of feature-by-feature versus module-by-module strategies remains an open question.
 
-\textbf{Strategy selection}: When should feature-by-feature be preferred over module-by-module? Our preliminary finding suggests feature-by-feature is better for codebases with cross-cutting concerns and high-complexity functions, while module-by-module works well for codebases with clear module boundaries.
+\textbf{Strategy selection}: When should feature-by-feature be preferred over module-by-module? Our observations showed different patterns by target language, but with only one run per configuration, we cannot determine whether these reflect systematic differences or run-to-run variance. Multiple runs per configuration would be needed to identify reliable strategy selection criteria.
 
 \textbf{Dependency management}: Can agents automatically select equivalent libraries in the target ecosystem, or does this require human guidance? How should dependency version constraints be handled?
 
@@ -285,7 +292,7 @@ The validated methodology provides a foundation for scaling research. Key questi
 
 \textbf{Incremental migration}: For large codebases, can migration proceed incrementally with interoperability between migrated and unmigrated modules? What FFI or serialization strategies enable gradual transition?
 
-\textbf{Cost scaling}: Our cost model (\$3.50--\$5.00 per KLOC) is derived from a single trivial system. How do costs scale with complexity? Are there complexity thresholds beyond which automated migration becomes cost-prohibitive?
+\textbf{Cost scaling}: Observed costs ranged from \$4.70 to \$6.60 per KLOC across four migrations of a single trivial system. How do costs scale with complexity? Are there complexity thresholds beyond which automated migration becomes cost-prohibitive? Characterizing the cost distribution would require additional runs.
 
 The success demonstrated in this paper represents a necessary but not sufficient condition for practical automated migration. We have proven that the approach works at small scale with two different strategies; the challenge now is determining how far it can scale.
 

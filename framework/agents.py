@@ -4,7 +4,7 @@ from languages.base import LanguageTarget
 from framework.config import ProjectConfig
 
 
-def build_io_contract_agent(config: ProjectConfig) -> dict:
+def build_io_contract_agent(config: ProjectConfig, project_dir: str) -> dict:
     """Build the I/O contract generator agent.
 
     This agent runs the source implementation on test inputs
@@ -50,17 +50,21 @@ Produce a structured I/O contract in markdown:
 <Document any inputs that produce errors>
 ```
 
+### Output Location
+Write the I/O contract to: {project_dir}/artifacts/PHASE_0_IO_CONTRACT.md
+
 ### Important
 - Run EVERY test input through the actual implementation
 - Capture outputs EXACTLY as produced
 - Do not guess or approximate - run the actual code
-- Include error messages for invalid inputs""",
-        "tools": ["Bash", "Read"],
+- Include error messages for invalid inputs
+- Write output ONLY to the specified location above""",
+        "tools": ["Bash", "Read", "Write"],
         "model": "haiku",
     }
 
 
-def build_analyst_agent(config: ProjectConfig, target: LanguageTarget) -> dict:
+def build_analyst_agent(config: ProjectConfig, target: LanguageTarget, project_dir: str) -> dict:
     """Build the analyst agent that reads source files and produces migration spec."""
     source_files_list = "\n".join(
         f"  - {config.source_directory}/{f}" for f in config.source_files
@@ -101,18 +105,22 @@ Produce a structured analysis for EACH module:
 <Brief summary of core logic that must be preserved>
 ```
 
+### Output Location
+Write the migration specification to: {project_dir}/artifacts/PHASE_1_MIGRATION_SPEC.md
+
 ### Important
 - Read each file completely
 - Focus on PUBLIC APIs that must be preserved
 - Document dependencies to ensure correct migration order
 - Note any {config.source_language.title()} patterns that need special {target.name.title()} handling
 - Be thorough but concise - this spec will guide all migrations
+- Write output ONLY to the specified location above
 
 ### I/O Contract Integration
 You will receive an I/O contract from Phase 0 containing expected input/output pairs.
 INCLUDE this contract verbatim in your migration spec under a section called "I/O Contract".
 This is critical for behavioral validation during migration.""",
-        "tools": ["Read", "Glob", "Grep"],
+        "tools": ["Read", "Glob", "Grep", "Write"],
         "model": "haiku",
     }
 
@@ -217,14 +225,18 @@ You will receive:
 PASS / FAIL with summary
 ```
 
+### Output Location
+Write the review report to: {project_dir}/artifacts/PHASE_3_REVIEW.md
+
 ### I/O Contract Validation
 
 Run the {target.name.title()} implementation on EACH test input from the I/O contract.
 Compare output to expected value EXACTLY.
 Report any differences as CRITICAL failures.
 
-Be critical but constructive. Focus on correctness first. I/O contract violations are blockers.""",
-        "tools": ["Read", "Glob", "Grep", "Bash"],
+Be critical but constructive. Focus on correctness first. I/O contract violations are blockers.
+Write output ONLY to the specified location above.""",
+        "tools": ["Read", "Glob", "Grep", "Bash", "Write"],
         "model": "haiku",
     }
 
@@ -243,8 +255,8 @@ def build_agents(
         Dictionary of agent name -> agent definition
     """
     return {
-        "io_contract": build_io_contract_agent(config),
-        "analyst": build_analyst_agent(config, target),
+        "io_contract": build_io_contract_agent(config, project_dir),
+        "analyst": build_analyst_agent(config, target, project_dir),
         "migrator": build_migrator_agent(config, target, project_dir),
         "reviewer": build_reviewer_agent(config, target, project_dir),
     }

@@ -156,9 +156,34 @@ async def run_migration(
         sys.exit(1)
 
     # Determine migration directory
-    # Structure: {base_dir}/projects/{project_name}/migrations/{target}-{strategy}/
+    # Structure: {base_dir}/projects/{project_name}/migrations/{target}-{strategy}-{run_number}/
     strategy_name = strategy.name if strategy else "module-by-module"
-    migration_name = f"{target.name}-{strategy_name}"
+    migration_base = f"{target.name}-{strategy_name}"
+
+    # Find next available run number
+    migrations_dir = Path(base_dir) / "projects" / config.name / "migrations"
+    migrations_dir.mkdir(parents=True, exist_ok=True)
+
+    existing_runs = [
+        d.name for d in migrations_dir.iterdir()
+        if d.is_dir() and d.name.startswith(migration_base)
+    ]
+
+    # Extract run numbers from existing directories
+    run_numbers = []
+    for name in existing_runs:
+        # Check for suffix like "-1", "-2", etc.
+        if name == migration_base:
+            run_numbers.append(0)  # Original unnumbered directory
+        elif name.startswith(f"{migration_base}-"):
+            try:
+                suffix = name[len(migration_base) + 1:]
+                run_numbers.append(int(suffix))
+            except ValueError:
+                pass
+
+    next_run = max(run_numbers, default=0) + 1
+    migration_name = f"{migration_base}-{next_run}"
     project_dir = f"{base_dir}/projects/{config.name}/migrations/{migration_name}"
 
     # Build prompt using strategy (or default to built-in prompt)
@@ -235,15 +260,34 @@ async def run_migration(
 
     message_count = 0
     migration_status = "success"
+    result_message = None
     try:
         async for message in query(prompt=prompt, options=options):
             message_count += 1
             _log_message(message, message_count, log_file)
 
-            # Record tool uses for metrics
-            if collector and hasattr(message, "type") and message.type == "tool_use":
-                tool_name = getattr(message, "name", "unknown")
-                collector.record_tool_use(tool_name)
+            # Record message for metrics
+            if collector:
+                collector.record_message()
+
+            # Record tool uses for metrics - check content for ToolUseBlocks
+            if collector and hasattr(message, "content"):
+                content = message.content
+                if isinstance(content, list):
+                    for item in content:
+                        if type(item).__name__ == "ToolUseBlock":
+                            tool_name = getattr(item, "name", "unknown")
+                            collector.record_tool_use(tool_name)
+                            # Track subagent invocations for Task tool
+                            if tool_name == "Task":
+                                tool_input = getattr(item, "input", {})
+                                if isinstance(tool_input, dict):
+                                    subagent_type = tool_input.get("subagent_type", "unknown")
+                                    collector.record_subagent(subagent_type)
+
+            # Capture ResultMessage for metrics extraction
+            if type(message).__name__ == "ResultMessage":
+                result_message = message
 
     except KeyboardInterrupt:
         log("\n\nMigration interrupted by user.", log_file)
@@ -260,8 +304,10 @@ async def run_migration(
 
     if collector:
         collector.end_phase("migration")
-        collector.agent_metrics.messages = message_count
-        if migration_status == "success":
+        # Use actual ResultMessage if captured, otherwise dummy for status only
+        if result_message:
+            collector.record_result(result_message)
+        elif migration_status == "success":
             collector.record_result(type("Result", (), {"status": "success"})())
 
     log("", log_file)

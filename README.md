@@ -16,17 +16,19 @@ The framework uses the [Claude Agent SDK](https://github.com/anthropics/claude-c
 
 Migrated `rpn2tex` (Python → Rust/Java, 352 LOC source):
 
-| Metric | Rust (Module) | Rust (Feature) | Java |
-|--------|---------------|----------------|------|
-| Duration | 25 min | 43 min | 25 min |
-| Cost | $3.74 | $6.07 | $7.24 |
-| I/O Match | 100% | 100% | 100% |
-| Production LOC | 1,184 | 931 | 1,547 |
+| Target | Strategy | Duration | Cost | I/O Match |
+|--------|----------|----------|------|-----------|
+| Rust | Module-by-module | ~32 min | $6.53 | 100% |
+| Rust | Feature-by-feature | ~32 min | $4.63 | 100% |
+| Java | Module-by-module | ~26 min | $4.92 | 100% |
+| Java | Feature-by-feature | ~51 min | $6.27 | 100% |
 
 **Insights:**
-- Feature-by-feature produces 21% less code but takes 72% longer
-- I/O contract validation catches behavioral regressions early
-- Module-by-module is faster but generates more boilerplate
+- Strategy efficiency varies by target language
+- For Rust: feature-by-feature saves ~30% cost
+- For Java: module-by-module saves ~22% cost
+- Both strategies produce identical behavioral output
+- I/O contract validation ensures behavioral equivalence
 
 See [docs/research/](docs/research/) for detailed analysis.
 
@@ -126,15 +128,17 @@ See [docs/REPORTING.md](docs/REPORTING.md) for the full API.
 
 Migrates each source module in dependency order. Each module is fully translated before moving to the next.
 
-**Pros:** Faster, simpler prompts, easier to debug
-**Cons:** May produce redundant code, less cohesive architecture
+**Pros:** Simpler prompts, easier to debug, more efficient for Java
+**Cons:** May produce redundant code
 
 ### Feature-by-Feature
 
 Migrates by feature slice, implementing end-to-end functionality incrementally. Validates I/O contract after each feature.
 
-**Pros:** More cohesive code, catches integration issues early, 21% less code
-**Cons:** 72% longer duration, more complex orchestration
+**Pros:** More cohesive code, catches integration issues early, more efficient for Rust
+**Cons:** More complex orchestration
+
+**Note:** Strategy efficiency varies by target language. See research findings above.
 
 See [docs/STRATEGIES.md](docs/STRATEGIES.md) for details.
 

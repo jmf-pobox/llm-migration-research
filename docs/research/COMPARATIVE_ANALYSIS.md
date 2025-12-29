@@ -15,10 +15,14 @@ Notes from experiments using the Claude Agent SDK to migrate a trivial Python co
 
 We wrote prompts describing a migration task and passed them to the Claude Agent SDK. The SDK and model did the actual work. Both migrations produced working code with 100% behavioral equivalence on our test set.
 
-| Target | Duration | Cost | I/O Match |
-|--------|----------|------|-----------|
-| Rust | ~25 min | $3.74 | 100% (21/21) |
-| Java | ~25 min | $7.24 | 100% (21/21) |
+| Target | Strategy | Duration | Cost | I/O Match |
+|--------|----------|----------|------|-----------|
+| Rust | Module-by-module | ~32 min | $6.53 | 100% (21/21) |
+| Rust | Feature-by-feature | ~32 min | $4.63 | 100% (21/21) |
+| Java | Module-by-module | ~26 min | $4.92 | 100% (21/21) |
+| Java | Feature-by-feature | ~51 min | $6.27 | 100% (21/21) |
+
+**Key finding:** Strategy efficiency varies by target language. For Rust, feature-by-feature saves ~30%. For Java, module-by-module saves ~22%.
 
 ### What We Built
 
@@ -162,7 +166,7 @@ Full list: 18 valid expressions, 3 error cases.
 
 ### Experiment: Module-by-Module vs Feature-by-Feature
 
-After validating module-by-module migration, we tested an alternative strategy: feature-by-feature migration. Both strategies migrated rpn2tex from Python to Rust.
+We tested two migration strategies on rpn2tex (Python → Rust). Both produced working code with 100% I/O contract match.
 
 ### Strategy Definitions
 
@@ -170,30 +174,34 @@ After validating module-by-module migration, we tested an alternative strategy: 
 
 **Feature-by-Feature**: Horizontal slices. Complete one feature (e.g., "addition operator") across all modules (lexer → parser → generator) before starting the next feature.
 
-### Results Comparison
+### Results (Rust Target, December 2025)
 
 | Metric | Module-by-Module | Feature-by-Feature |
 |--------|------------------|-------------------|
-| Duration | ~25 min | ~43 min |
-| Total Source Lines | 2,530 | 1,057 |
-| Production Code | 1,184 | 931 |
-| Inline Test Code | 1,346 | 126 |
-| Integration Tests | 0 | 24 |
-| Total Tests | 93 | 51 |
-| External Dependencies | 2 (clap, thiserror) | 0 |
+| Duration (wall clock) | ~32 min | ~32 min |
+| Cost | $6.53 | $4.63 |
+| Messages | 937 | 742 |
+| API time | 55 min | 33 min |
+| Subagent calls | 16 | 9 |
 | I/O Contract Match | 100% | 100% |
 
-### Key Finding: Duration Difference
+### Key Finding: Cost Efficiency
 
-Feature-by-feature took 72% longer (43 vs 25 minutes) due to incremental I/O validation after each of the 6 feature slices. This overhead is acceptable for larger codebases where catching errors earlier saves rework.
+Feature-by-feature costs **~30% less** than module-by-module with equivalent wall-clock time and identical output quality. The savings come from:
 
-### Key Finding: Production Code Difference
+1. **Fewer API round-trips** (33 min vs 55 min API time)
+2. **More focused subagent tasks** (9 vs 16 Task invocations)
+3. **Better cache efficiency** on repeated patterns within features
 
-The 58% total LOC difference (2,530 vs 1,057) was misleading. Actual breakdown:
+### Key Finding: Both Strategies Succeed
 
-- **Test location**: Module-by-module has 74 unit tests inline in source files; feature-by-feature has tests in separate `tests/` directory
-- **Production code**: Only 21% difference (1,184 vs 931 lines)
-- **Coding style**: Module-by-module used external crates and more elaborate error formatting
+Both strategies reliably produce:
+- Working code that compiles
+- 100% I/O contract match
+- Passing test suites
+- Clean linting (clippy, fmt)
+
+The choice between strategies is about cost optimization, not correctness.
 
 ### Output Verification
 
@@ -211,30 +219,59 @@ Feature-by-feature: $100 \div 10 \div 5 \div 2$
 
 ### When to Use Each Strategy
 
-**Module-by-Module** is better when:
-- Clear module boundaries exist
-- Modules have minimal cross-cutting concerns
-- You want comprehensive unit test coverage per module
+**Feature-by-Feature** (recommended default):
+- Lower cost (~30% savings)
+- Incremental I/O validation catches errors early
+- Works well when features span multiple modules
 
-**Feature-by-Feature** is better when:
-- Features span multiple modules
-- Incremental I/O validation is important
-- Codebase has high complexity functions that benefit from feature isolation
+**Module-by-Module**:
+- Easier to reason about for simple codebases
+- Better when modules are highly independent
+- Produces more comprehensive per-module test suites
 
-### Recommendation for Larger Codebases
+---
 
-For txt2tex (~10k LOC, avg CC 6.7, max CC 40), feature-by-feature is the recommended strategy because:
-1. High-complexity functions (e.g., parser with CC=40) can be tackled incrementally
-2. Each feature has its own I/O contract for validation
-3. Dependency ordering is handled per-feature, not per-module
+## Cross-Language Comparison
+
+### Java Results (December 2025)
+
+| Metric | Module-by-Module | Feature-by-Feature |
+|--------|------------------|-------------------|
+| Duration (wall clock) | ~26 min | ~51 min |
+| Cost | $4.92 | $6.27 |
+| Messages | 871 | 1026 |
+| API time | 45 min | 54 min |
+| Subagent calls | 16 | 14 |
+| I/O Contract Match | 100% | 100% |
+
+### Key Finding: Strategy Efficiency Varies by Target
+
+| Target | Better Strategy | Cost Savings |
+|--------|-----------------|--------------|
+| Rust | Feature-by-feature | ~30% |
+| Java | Module-by-module | ~22% |
+
+The reversal suggests:
+- **Rust**: Feature-by-feature benefits from Rust's module system and cargo's incremental compilation
+- **Java**: Module-by-module benefits from Java's class-based structure where complete classes are easier to verify
+
+### Both Strategies Work
+
+Regardless of which is more efficient, both strategies reliably produce:
+- Working code that compiles
+- 100% I/O contract match
+- Passing test suites
+
+The cost difference is optimization, not correctness.
 
 ---
 
 ## Next Steps
 
-1. Apply feature-by-feature strategy to txt2tex (~10k LOC)
-2. Validate with external dependencies
-3. Compare cost/time scaling between strategies
+1. ~~Run both strategies on Java target for comparison~~ ✓ Done
+2. Apply strategies to txt2tex (~10k LOC) to test scaling
+3. Validate with external dependencies
+4. Investigate why strategy efficiency varies by target language
 
 ---
 
