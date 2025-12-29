@@ -37,35 +37,31 @@ See [docs/research/](docs/research/) for detailed analysis.
 ```
 .
 ├── run_migration.py          # CLI entry point
-├── framework/
+├── src/migration/            # Main package
 │   ├── config.py             # YAML project configuration
 │   ├── agents.py             # Sub-agent prompt templates
-│   └── runner.py             # SDK orchestration + metrics integration
-├── strategies/
-│   ├── base.py               # Strategy interface
-│   ├── module_by_module.py   # Migrate by source module
-│   └── feature_by_feature.py # Migrate by feature slice
-├── languages/
-│   ├── base.py               # Language target interface
-│   ├── rust.py               # Rust-specific config
-│   └── java.py               # Java-specific config
-├── reporting/
-│   ├── schema.py             # MigrationMetrics dataclass
-│   ├── collector.py          # Real-time metrics collection
-│   ├── analyzer.py           # Post-hoc analysis (lizard, cloc)
-│   ├── database.py           # SQLite storage & aggregation
-│   ├── generator.py          # Jinja2 report rendering
-│   ├── cli.py                # Reporting CLI
-│   └── templates/            # Markdown & LaTeX templates
+│   ├── runner.py             # SDK orchestration + metrics integration
+│   ├── strategies/           # Migration approaches
+│   │   ├── base.py           # Strategy interface
+│   │   ├── module_by_module.py
+│   │   └── feature_by_feature.py
+│   ├── languages/            # Target language configs
+│   │   ├── base.py           # Language target interface
+│   │   ├── rust.py
+│   │   └── java.py
+│   └── reporting/            # Telemetry and analysis
+│       ├── schema.py         # MigrationMetrics dataclass
+│       ├── collector.py      # Real-time metrics collection
+│       ├── analyzer.py       # Post-hoc analysis (lizard, cloc)
+│       ├── database.py       # SQLite storage & aggregation
+│       ├── generator.py      # Jinja2 report rendering
+│       └── cli.py            # Reporting CLI
 ├── projects/
 │   └── {project}/
 │       ├── config.yaml       # Project definition
 │       ├── source/           # Original source code
 │       └── migrations/       # Output by target-strategy
 └── docs/
-    ├── REPORTING.md          # Telemetry framework docs
-    ├── STRATEGIES.md         # Migration strategy guide
-    ├── PROJECT_INDEX.md      # Links to all project reports
     └── research/             # Analysis papers
 ```
 
@@ -204,9 +200,6 @@ class MyStrategy(MigrationStrategy):
 
 | Document | Description |
 |----------|-------------|
-| [docs/STRATEGIES.md](docs/STRATEGIES.md) | Migration strategy comparison |
-| [docs/REPORTING.md](docs/REPORTING.md) | Telemetry framework reference |
-| [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md) | Links to all project reports |
 | [docs/research/](docs/research/) | Analysis papers and findings |
 
 ## License

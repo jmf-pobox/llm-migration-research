@@ -1,0 +1,12 @@
+[package]
+name = "rpn2tex"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dev-dependencies]
+
+[[bin]]
+name = "rpn2tex"
+path = "src/main.rs"

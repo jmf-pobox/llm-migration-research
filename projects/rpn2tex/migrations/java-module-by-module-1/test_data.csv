@@ -1,0 +1,22 @@
+Test#,Input,Expected Output,Status,Category,Notes
+1,"5 3 +","$5 + 3$",SUCCESS,Basic Addition,Simple two-number addition
+2,"5 3 -","$5 - 3$",SUCCESS,Basic Subtraction,Simple two-number subtraction
+3,"4 7 *","$4 \times 7$",SUCCESS,Basic Multiplication,Uses LaTeX \times command
+4,"10 2 /","$10 \div 2$",SUCCESS,Basic Division,Uses LaTeX \div command
+5,"2 3 ^",ERROR: Unexpected character '^',ERROR,Unsupported Operator,Exponentiation not supported
+6,"5 3 + 2 *","$( 5 + 3 ) \times 2$",SUCCESS,Precedence & Parentheses,Addition (lower precedence) parenthesized in multiplication
+7,"5 3 * 2 +","$5 \times 3 + 2$",SUCCESS,Precedence & Parentheses,Multiplication doesn't need parentheses before addition
+8,"10 2 / 5 *","$10 \div 2 \times 5$",SUCCESS,Left-to-Right Evaluation,Same precedence operations chain without parentheses
+9,"5 3 - 2 -","$5 - 3 - 2$",SUCCESS,Chained Operations,Multiple subtractions without parentheses
+10,"100 10 / 5 / 2 /","$100 \div 10 \div 5 \div 2$",SUCCESS,Chained Operations,Multiple divisions without parentheses
+11,"1 2 + 3 + 4 +","$1 + 2 + 3 + 4$",SUCCESS,Chained Operations,Multiple additions without parentheses
+12,"2 3 4 * +","$2 + 3 \times 4$",SUCCESS,Precedence & Parentheses,Multiplication has higher precedence than addition
+13,"2 3 + 4 *","$( 2 + 3 ) \times 4$",SUCCESS,Precedence & Parentheses,Addition (lower precedence) parenthesized in multiplication context
+14,"2 3 4 + *","$2 \times ( 3 + 4 )$",SUCCESS,Precedence & Parentheses,Addition (lower precedence) parenthesized in multiplication context
+15,"2 3 * 4 +","$2 \times 3 + 4$",SUCCESS,Precedence & Parentheses,Multiplication doesn't need parentheses before addition
+16,"2 3 ^ 4 *",ERROR: Unexpected character '^',ERROR,Unsupported Operator,Exponentiation not supported
+17,"2 3 4 ^ ^",ERROR: Unexpected character '^',ERROR,Unsupported Operator,Exponentiation not supported
+18,"3.14 2 *","$3.14 \times 2$",SUCCESS,Decimal Numbers,Handles floating-point numbers
+19,"1.5 0.5 +","$1.5 + 0.5$",SUCCESS,Decimal Numbers,Floating-point arithmetic
+20,"1 2 + 3 4 + *","$( 1 + 2 ) \times ( 3 + 4 )$",SUCCESS,Complex Precedence,Multiple parenthesized groups
+21,"10 2 / 3 + 4 *","$( 10 \div 2 + 3 ) \times 4$",SUCCESS,Complex Precedence,Complex expression with mixed operators

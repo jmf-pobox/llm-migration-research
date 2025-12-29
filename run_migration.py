@@ -26,12 +26,12 @@ if not os.environ.get("ANTHROPIC_API_KEY"):
     print("Set it with: export ANTHROPIC_API_KEY=your-api-key")
     sys.exit(1)
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# Add src directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from framework import load_project_config, run_migration
-from languages import get_language_target, LANGUAGE_REGISTRY
-from strategies import get_strategy, STRATEGY_REGISTRY
+from migration import load_project_config, run_migration
+from migration.languages import get_language_target, LANGUAGE_REGISTRY
+from migration.strategies import get_strategy, STRATEGY_REGISTRY
 
 
 def list_languages() -> None:

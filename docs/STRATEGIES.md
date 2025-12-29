@@ -21,7 +21,7 @@ class MyStrategy(MigrationStrategy):
 
 ### Module-by-Module
 
-**File:** `strategies/module_by_module.py`
+**File:** `src/migration/strategies/module_by_module.py`
 
 Migrates each source module (file) in dependency order. Each module is fully translated before moving to the next.
 
@@ -60,7 +60,7 @@ python run_migration.py --target rust --project projects/rpn2tex --strategy modu
 
 ### Feature-by-Feature
 
-**File:** `strategies/feature_by_feature.py`
+**File:** `src/migration/strategies/feature_by_feature.py`
 
 Migrates by feature slice, implementing end-to-end functionality incrementally. Each feature is validated against the I/O contract before proceeding.
 
@@ -125,7 +125,7 @@ python run_migration.py --target rust --project projects/rpn2tex --strategy feat
 
 ## Adding a New Strategy
 
-1. Create `strategies/{name}.py`:
+1. Create `src/migration/strategies/{name}.py`:
 
 ```python
 from strategies.base import MigrationStrategy
@@ -154,7 +154,7 @@ Migrate {config.name} from {config.source_language} to {target.name}.
 """
 ```
 
-2. Register in `strategies/__init__.py`:
+2. Register in `src/migration/strategies/__init__.py`:
 
 ```python
 from .my_strategy import MyStrategy

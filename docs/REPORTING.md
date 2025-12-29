@@ -21,7 +21,7 @@ Migration Run
 
 ## Components
 
-### Schema (`reporting/schema.py`)
+### Schema (`src/migration/reporting/schema.py`)
 
 Defines the canonical `MigrationMetrics` dataclass with 10 metric categories:
 
@@ -38,7 +38,7 @@ Defines the canonical `MigrationMetrics` dataclass with 10 metric categories:
 | **I/O Contract** | total_test_cases, passed, failed, unsupported, match_rate_pct |
 | **Outcome** | status, modules_completed, modules_total, blocking_issues, notes |
 
-### Collector (`reporting/collector.py`)
+### Collector (`src/migration/reporting/collector.py`)
 
 Real-time metrics collection during migration execution:
 
@@ -73,7 +73,7 @@ metrics.save("metrics.json")
 
 Also includes `LogParser` for backfilling metrics from existing log files.
 
-### Analyzer (`reporting/analyzer.py`)
+### Analyzer (`src/migration/reporting/analyzer.py`)
 
 Post-hoc analysis using external tools:
 
@@ -96,7 +96,7 @@ External tools used:
 - **cargo check/clippy/fmt/test**: Rust quality gates
 - **cargo-tarpaulin**: Rust code coverage
 
-### Database (`reporting/database.py`)
+### Database (`src/migration/reporting/database.py`)
 
 SQLite storage for aggregation across runs:
 
@@ -122,7 +122,7 @@ for name, stats in by_strategy.items():
     print(f"{name}: {stats.count} runs")
 ```
 
-### Generator (`reporting/generator.py`)
+### Generator (`src/migration/reporting/generator.py`)
 
 Template-based report generation:
 
@@ -144,7 +144,7 @@ latex = generator.generate_latex_table([metrics1, metrics2], caption="Results")
 summary = generator.generate_summary(db)
 ```
 
-### CLI (`reporting/cli.py`)
+### CLI (`src/migration/reporting/cli.py`)
 
 Command-line interface for all operations:
 
@@ -175,7 +175,7 @@ python -m reporting report metrics/run_20251228.json --format markdown
 
 ## Templates
 
-Jinja2 templates in `reporting/templates/`:
+Jinja2 templates in `src/migration/reporting/templates/`:
 
 | Template | Purpose |
 |----------|---------|
@@ -186,7 +186,7 @@ Jinja2 templates in `reporting/templates/`:
 
 ## Integration
 
-The framework is integrated into `framework/runner.py`. When `collect_metrics=True` (default):
+The framework is integrated into `src/migration/runner.py`. When `collect_metrics=True` (default):
 
 1. MetricsCollector is initialized at migration start
 2. Tool uses and phases are recorded during execution
