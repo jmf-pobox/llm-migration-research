@@ -4,7 +4,9 @@ This module defines the standardized data structures for capturing
 and analyzing migration metrics at scale.
 """
 
+import importlib.metadata
 import json
+import platform
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -51,8 +53,17 @@ class IdentityMetrics:
         source_language: str,
         target_language: str,
         strategy: str,
+        model_id: str | None = None,
     ) -> "IdentityMetrics":
         """Create new identity with generated run_id and current timestamp."""
+        import contextlib
+
+        host_platform = f"{platform.system()} {platform.release()}"
+
+        sdk_version = None
+        with contextlib.suppress(importlib.metadata.PackageNotFoundError):
+            sdk_version = importlib.metadata.version("claude-agent-sdk")
+
         return cls(
             run_id=str(uuid.uuid4()),
             project_name=project_name,
@@ -60,6 +71,9 @@ class IdentityMetrics:
             target_language=target_language,
             strategy=strategy,
             started_at=datetime.now().isoformat(),
+            host_platform=host_platform,
+            sdk_version=sdk_version,
+            model_id=model_id,
         )
 
 
@@ -165,7 +179,7 @@ class FormattingResult:
 
 
 @dataclass
-class TestResult:
+class TestOutcomeResult:
     """Test execution quality gate result."""
 
     passed: bool = False
@@ -199,7 +213,7 @@ class QualityGates:
     compilation: CompilationResult = field(default_factory=CompilationResult)
     linting: LintingResult = field(default_factory=LintingResult)
     formatting: FormattingResult = field(default_factory=FormattingResult)
-    unit_tests: TestResult = field(default_factory=TestResult)
+    unit_tests: TestOutcomeResult = field(default_factory=TestOutcomeResult)
     coverage: CoverageResult = field(default_factory=CoverageResult)
     idiomaticness: IdiomaticnessResult = field(default_factory=IdiomaticnessResult)
 
@@ -323,7 +337,7 @@ class MigrationMetrics:
             compilation=CompilationResult(**(qg_data.get("compilation") or {})),
             linting=LintingResult(**(qg_data.get("linting") or {})),
             formatting=FormattingResult(**(qg_data.get("formatting") or {})),
-            unit_tests=TestResult(**(qg_data.get("unit_tests") or {})),
+            unit_tests=TestOutcomeResult(**(qg_data.get("unit_tests") or {})),
             coverage=CoverageResult(**(qg_data.get("coverage") or {})),
             idiomaticness=IdiomaticnessResult(**(qg_data.get("idiomaticness") or {})),
         )

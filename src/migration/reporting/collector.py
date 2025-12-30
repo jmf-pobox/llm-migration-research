@@ -61,12 +61,14 @@ class MetricsCollector:
         source_language: str,
         target_language: str,
         strategy: str,
+        model_id: str | None = None,
     ):
         self.identity = IdentityMetrics.create(
             project_name=project_name,
             source_language=source_language,
             target_language=target_language,
             strategy=strategy,
+            model_id=model_id,
         )
         self.timing = TimingMetrics()
         self.cost = CostMetrics()
@@ -82,6 +84,7 @@ class MetricsCollector:
         self._phase_start_times: dict[str, float] = {}
         self._module_start_times: dict[str, float] = {}
         self._module_attempts: dict[str, int] = {}
+        self._active_module: str | None = None
         self._start_time = time.time()
         self._message_count = 0
 
@@ -103,6 +106,7 @@ class MetricsCollector:
         self._module_attempts[module_name] = (
             self._module_attempts.get(module_name, 0) + 1
         )
+        self._active_module = module_name
 
     def end_module(self, module_name: str, attempts: int | None = None) -> None:
         """Mark the end of a module migration."""
@@ -118,6 +122,9 @@ class MetricsCollector:
                     attempts=actual_attempts,
                 )
             )
+            del self._module_start_times[module_name]
+            if self._active_module == module_name:
+                self._active_module = None
 
     def record_tool_use(self, tool_name: str) -> None:
         """Record a tool invocation."""
@@ -143,16 +150,23 @@ class MetricsCollector:
         """Record a retry attempt."""
         self.agent.retry_count += 1
 
-    def record_coverage(self, line_coverage: float | None) -> None:
-        """Record test coverage percentage.
+    def record_coverage(
+        self,
+        line_coverage: float | None,
+        function_coverage: float | None = None,
+        branch_coverage: float | None = None,
+    ) -> None:
+        """Record test coverage percentages.
 
         Args:
-            line_coverage: Line coverage percentage (0-100), or None if unavailable
+            line_coverage: Line coverage percentage (0-100)
+            function_coverage: Function coverage percentage (0-100)
+            branch_coverage: Branch coverage percentage (0-100)
         """
         self.quality_gates.coverage = CoverageResult(
             line_coverage_pct=line_coverage,
-            function_coverage_pct=None,
-            branch_coverage_pct=None,
+            function_coverage_pct=function_coverage,
+            branch_coverage_pct=branch_coverage,
         )
 
     def record_idiomaticness(

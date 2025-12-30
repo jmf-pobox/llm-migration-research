@@ -29,9 +29,7 @@ fn add(a: i32, b: i32) -> i32 {
     a + b
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".rs", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".rs", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -57,9 +55,7 @@ mod tests {
     }
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".rs", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".rs", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -83,9 +79,7 @@ fn main() {
     // Another comment
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".rs", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".rs", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -108,9 +102,7 @@ func main() {
     fmt.Println("Hello")
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".go", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".go", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -164,9 +156,7 @@ public class Main {
     }
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".java", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -226,9 +216,7 @@ package com.example;
 public class Main {
 }
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".java", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".java", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -243,16 +231,14 @@ class TestCountPythonLoc:
 
     def test_production_file(self) -> None:
         """Test regular Python file."""
-        content = '''
+        content = """
 def main():
     print("Hello")
 
 if __name__ == "__main__":
     main()
-'''
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -300,9 +286,7 @@ def main():
     """This is a docstring."""
     print("Hello")
 '''
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -321,9 +305,7 @@ def main():
     """
     print("Hello")
 '''
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(content)
             f.flush()
 
@@ -360,7 +342,7 @@ class TestMeasureLoc:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create Rust file
             rust_file = Path(tmpdir) / "main.rs"
-            rust_file.write_text("fn main() {\n    println!(\"Hello\");\n}\n")
+            rust_file.write_text('fn main() {\n    println!("Hello");\n}\n')
 
             prod, _test, count = measure_loc(tmpdir, "rust")
 

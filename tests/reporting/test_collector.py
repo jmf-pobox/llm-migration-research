@@ -36,6 +36,21 @@ class MockResultMessage:
 class TestMetricsCollector:
     """Tests for MetricsCollector class."""
 
+    def test_identity_creation(self) -> None:
+        """Test that IdentityMetrics.create captures environment info."""
+        collector = MetricsCollector(
+            "test_project", "python", "rust", "module-by-module", model_id="sonnet"
+        )
+        metrics = collector.finalize()
+
+        assert metrics.identity.project_name == "test_project"
+        assert metrics.identity.source_language == "python"
+        assert metrics.identity.target_language == "rust"
+        assert metrics.identity.strategy == "module-by-module"
+        assert metrics.identity.model_id == "sonnet"
+        assert metrics.identity.host_platform is not None
+        assert " " in metrics.identity.host_platform  # Should have system + release
+
     def test_message_counting(self) -> None:
         """Test that messages are properly counted via record_message()."""
         collector = MetricsCollector("test", "python", "rust", "test")

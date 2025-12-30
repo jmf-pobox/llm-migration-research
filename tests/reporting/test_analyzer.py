@@ -69,7 +69,9 @@ class TestAnalyzePythonSource:
 class TestAnalyzeRustTarget:
     """Tests for analyze_rust_target method."""
 
-    @patch("migration.reporting.analyzer.PostHocAnalyzer._count_rust_loc_with_inline_tests")
+    @patch(
+        "migration.reporting.analyzer.PostHocAnalyzer._count_rust_loc_with_inline_tests"
+    )
     @patch("migration.reporting.analyzer.PostHocAnalyzer._run_cloc")
     @patch("migration.reporting.analyzer.PostHocAnalyzer._run_lizard")
     @patch("migration.reporting.analyzer.PostHocAnalyzer._count_cargo_deps")
@@ -180,13 +182,13 @@ class TestAnalyzeRustQuality:
             CoverageResult,
             FormattingResult,
             LintingResult,
-            TestResult,
+            TestOutcomeResult,
         )
 
         mock_check.return_value = CompilationResult(passed=True)
         mock_clippy.return_value = LintingResult(passed=True, tool="clippy")
         mock_fmt.return_value = FormattingResult(passed=True, tool="rustfmt")
-        mock_test.return_value = TestResult(
+        mock_test.return_value = TestOutcomeResult(
             passed=True, total=10, passed_count=10, failed_count=0, skipped_count=0
         )
         mock_coverage.return_value = CoverageResult(line_coverage_pct=85.0)

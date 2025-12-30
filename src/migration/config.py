@@ -19,7 +19,7 @@ class ModuleConfig:
 
 
 @dataclass
-class TestCase:
+class MigrationTestCase:
     """A single test case with input and expected output."""
 
     input: str
@@ -33,7 +33,7 @@ class FeatureConfig:
     name: str
     description: str
     touches: list[str]  # Files this feature touches
-    test_cases: list[TestCase]
+    test_cases: list[MigrationTestCase]
     depends_on: list[str] = field(default_factory=list)
 
 
@@ -121,7 +121,7 @@ def _parse_config(data: dict[str, Any]) -> ProjectConfig:
             description=f.get("description", ""),
             touches=f.get("touches", []),
             test_cases=[
-                TestCase(input=tc["input"], output=tc["output"])
+                MigrationTestCase(input=tc["input"], output=tc["output"])
                 for tc in f.get("test_cases", [])
             ],
             depends_on=f.get("depends_on", []),

@@ -1,5 +1,6 @@
 """Core migration orchestration logic."""
 
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from .agents import build_agents
+from .checkpoint import CheckpointManager
 from .config import ProjectConfig
 from .languages.base import LanguageTarget
 
@@ -492,6 +494,7 @@ async def run_migration(
     dry_run: bool = False,
     strategy: "MigrationStrategy | None" = None,
     collect_metrics: bool = True,
+    resume_dir: str | None = None,
 ) -> Optional["MetricsCollector"]:
     """Run the migration using Claude Agent SDK.
 
@@ -502,6 +505,7 @@ async def run_migration(
         dry_run: If True, only print what would be done
         strategy: Migration strategy to use (defaults to module-by-module)
         collect_metrics: If True, collect metrics during migration
+        resume_dir: If provided, resume migration from this directory using checkpoint
 
     Returns:
         MetricsCollector with migration metrics if collect_metrics is True, else None
@@ -519,32 +523,58 @@ async def run_migration(
     strategy_name = strategy.name if strategy else "module-by-module"
     migration_base = f"{target.name}-{strategy_name}"
 
-    # Find next available run number
-    migrations_dir = Path(base_dir) / "projects" / config.name / "migrations"
-    migrations_dir.mkdir(parents=True, exist_ok=True)
+    # Resume from existing directory or create new one
+    checkpoint_manager: CheckpointManager | None = None
+    resume_session_id: str | None = None
 
-    existing_runs = [
-        d.name
-        for d in migrations_dir.iterdir()
-        if d.is_dir() and d.name.startswith(migration_base)
-    ]
+    if resume_dir:
+        # Resume from existing directory
+        project_dir = resume_dir
+        checkpoint_manager = CheckpointManager(Path(resume_dir))
 
-    # Extract run numbers from existing directories
-    run_numbers = []
-    for name in existing_runs:
-        # Check for suffix like "-1", "-2", etc.
-        if name == migration_base:
-            run_numbers.append(0)  # Original unnumbered directory
-        elif name.startswith(f"{migration_base}-"):
-            try:
-                suffix = name[len(migration_base) + 1 :]
-                run_numbers.append(int(suffix))
-            except ValueError:
-                pass
+        if checkpoint_manager.can_resume():
+            session_id, completed_features, failed_feature = (
+                checkpoint_manager.get_resume_info()
+            )
+            resume_session_id = session_id
+            print("Resuming migration from checkpoint")
+            print(f"  Session ID: {session_id[:20]}...")
+            print(f"  Completed features: {completed_features}")
+            if failed_feature:
+                print(f"  Resuming from failed feature: {failed_feature}")
+        else:
+            print(f"Warning: No valid checkpoint found in {resume_dir}")
+            print("Starting fresh migration in same directory")
+    else:
+        # Find next available run number
+        migrations_dir = Path(base_dir) / "projects" / config.name / "migrations"
+        migrations_dir.mkdir(parents=True, exist_ok=True)
 
-    next_run = max(run_numbers, default=0) + 1
-    migration_name = f"{migration_base}-{next_run}"
-    project_dir = f"{base_dir}/projects/{config.name}/migrations/{migration_name}"
+        existing_runs = [
+            d.name
+            for d in migrations_dir.iterdir()
+            if d.is_dir() and d.name.startswith(migration_base)
+        ]
+
+        # Extract run numbers from existing directories
+        run_numbers = []
+        for name in existing_runs:
+            # Check for suffix like "-1", "-2", etc.
+            if name == migration_base:
+                run_numbers.append(0)  # Original unnumbered directory
+            elif name.startswith(f"{migration_base}-"):
+                try:
+                    suffix = name[len(migration_base) + 1 :]
+                    run_numbers.append(int(suffix))
+                except ValueError:
+                    pass
+
+        next_run = max(run_numbers, default=0) + 1
+        migration_name = f"{migration_base}-{next_run}"
+        project_dir = f"{base_dir}/projects/{config.name}/migrations/{migration_name}"
+
+        # Create checkpoint manager for new migration
+        checkpoint_manager = CheckpointManager(Path(project_dir))
 
     # Build prompt using strategy (or default to built-in prompt)
     if strategy:
@@ -573,11 +603,15 @@ async def run_migration(
         try:
             from .reporting.collector import MetricsCollector
 
+            # Get model_id from migrator agent if available
+            model_id = agents_config.get("migrator", {}).get("model")
+
             collector = MetricsCollector(
                 project_name=config.name,
                 source_language=config.source_language,
                 target_language=target.name,
                 strategy=strategy_name,
+                model_id=model_id,
             )
             collector.start_phase("setup")
         except ImportError:
@@ -601,12 +635,32 @@ async def run_migration(
     log(f"Log file: {log_file}", log_file)
     log("=" * 60, log_file)
 
-    # Measure source LOC
+    # Measure source metrics
     if collector:
-        src_prod, src_test, src_files = measure_loc(
-            config.source_directory, config.source_language, log_file
-        )
-        collector.record_source_loc(src_prod, src_test, src_files)
+        log("Analyzing source code with PostHocAnalyzer...", log_file)
+        try:
+            from .reporting.analyzer import PostHocAnalyzer
+
+            analyzer = PostHocAnalyzer()
+            source_metrics = analyzer.analyze_python_source(
+                Path(config.source_directory)
+            )
+            collector.source_metrics = source_metrics
+            log(
+                f"Source Metrics: {source_metrics.production_loc} prod LOC, "
+                f"{source_metrics.function_count} functions, "
+                f"{source_metrics.avg_cyclomatic_complexity:.2f} avg CC",
+                log_file,
+            )
+        except Exception as e:
+            log(
+                f"Warning: PostHocAnalyzer failed for source, using fallback: {e}",
+                log_file,
+            )
+            src_prod, src_test, src_files = measure_loc(
+                config.source_directory, config.source_language, log_file
+            )
+            collector.record_source_loc(src_prod, src_test, src_files)
 
     # Create AgentDefinition objects
     agents = {
@@ -619,11 +673,27 @@ async def run_migration(
         for name, agent in agents_config.items()
     }
 
+    def stderr_handler(line: str) -> None:
+        """Capture stderr from subprocesses to the log file."""
+        log(f"[stderr] {line}", log_file)
+
+    # Build options with optional resume
     options = ClaudeAgentOptions(
         allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task"],
         agents=agents,
         permission_mode="acceptEdits",
+        stderr=stderr_handler,
+        resume=resume_session_id,
+        enable_file_checkpointing=True,
     )
+
+    # Create initial checkpoint for new migrations
+    if checkpoint_manager and not resume_dir:
+        checkpoint_manager.create_initial(
+            project=config.name,
+            target=target.name,
+            strategy=strategy_name,
+        )
 
     if collector:
         collector.end_phase("setup")
@@ -658,15 +728,64 @@ async def run_migration(
                                     )
                                     collector.record_subagent(subagent_type)
 
+                                    # Bug #2: Track module timing
+                                    # Task tool for migrator typically includes 'module' in prompt or input
+                                    if subagent_type == "migrator":
+                                        # End previous module if any
+                                        if collector._active_module:
+                                            collector.end_module(
+                                                collector._active_module
+                                            )
+
+                                        # Look for module name in task prompt or input
+                                        task_prompt = str(tool_input.get("task", ""))
+                                        # Extract module name - assumes standard phrasing like "Migrate module X"
+                                        module_match = re.search(
+                                            r"module\s+(['\"]?)([\w.]+)\1",
+                                            task_prompt,
+                                            re.IGNORECASE,
+                                        )
+                                        if module_match:
+                                            module_name = module_match.group(2)
+                                            collector.start_module(module_name)
+
+                                    if (
+                                        subagent_type == "reviewer"
+                                        and collector._active_module
+                                    ):
+                                        # End previous module if it was a migrator task
+                                        collector.end_module(collector._active_module)
+
             # Capture ResultMessage for metrics extraction
             if type(message).__name__ == "ResultMessage":
                 result_message = message
+                # Bug #2: End any remaining module timing
+                if collector:
+                    if collector._active_module:
+                        collector.end_module(collector._active_module)
+
+                    # Ensure modules_completed is accurate (Bug #5)
+                    completed = len(collector.timing.module_durations)
+                    collector.set_outcome(
+                        status="success"
+                        if getattr(result_message, "subtype", "failure") == "success"
+                        else "failure",
+                        modules_completed=completed,
+                        modules_total=len(config.modules),
+                    )
 
     except KeyboardInterrupt:
         log("\n\nMigration interrupted by user.", log_file)
         migration_status = "interrupted"
         if collector:
             collector.record_result(type("Result", (), {"status": "interrupted"})())
+        # Save checkpoint on interrupt
+        if checkpoint_manager and result_message:
+            session_id = getattr(result_message, "session_id", "")
+            if session_id:
+                checkpoint_manager.mark_feature_failed(
+                    "unknown", "Interrupted by user", session_id
+                )
         sys.exit(1)
     except Exception as e:
         log(f"\n\nError during migration: {e}", log_file)
@@ -675,7 +794,25 @@ async def run_migration(
             collector.record_result(
                 type("Result", (), {"status": "failure", "error": str(e)})()
             )
+        # Save checkpoint on failure
+        if checkpoint_manager and result_message:
+            session_id = getattr(result_message, "session_id", "")
+            if session_id:
+                checkpoint_manager.mark_feature_failed("unknown", str(e), session_id)
         raise
+
+    # Save checkpoint on success
+    if checkpoint_manager and result_message:
+        session_id = getattr(result_message, "session_id", "")
+        if session_id:
+            # Mark migration as fully completed
+            state = checkpoint_manager.load()
+            if state:
+                state.session_id = session_id
+                state.current_feature = None
+                state.failed_feature = None
+                state.error_message = None
+                checkpoint_manager.save(state)
 
     if collector:
         collector.end_phase("migration")
@@ -701,6 +838,7 @@ async def run_migration(
         log("Analyzing target code with PostHocAnalyzer...", log_file)
         try:
             from .reporting.analyzer import PostHocAnalyzer
+            from .reporting.schema import CodeMetrics
 
             analyzer = PostHocAnalyzer()
             target_path = Path(project_dir)
@@ -711,11 +849,16 @@ async def run_migration(
                 quality_gates = analyzer.analyze_rust_quality(target_path)
                 # Use coverage from quality gates if available
                 if quality_gates.coverage.line_coverage_pct is not None:
-                    collector.record_coverage(quality_gates.coverage.line_coverage_pct)
+                    collector.record_coverage(
+                        quality_gates.coverage.line_coverage_pct,
+                        quality_gates.coverage.function_coverage_pct,
+                        quality_gates.coverage.branch_coverage_pct,
+                    )
                 else:
                     # Fallback to manual coverage measurement
                     coverage = measure_coverage(target, project_dir, log_file)
                     collector.record_coverage(coverage)
+                collector.quality_gates = quality_gates
             elif target.name == "java":
                 target_metrics = analyzer.analyze_java_target(target_path)
                 # Java coverage from measure_coverage
@@ -729,17 +872,11 @@ async def run_migration(
                 # Fallback to manual measurement for unknown targets
                 target_dir = target.get_source_dir(project_dir)
                 tgt_prod, tgt_test, _ = measure_loc(target_dir, target.name, log_file)
-                target_metrics = type(
-                    "Metrics", (), {"production_loc": tgt_prod, "test_loc": tgt_test}
-                )()
+                target_metrics = CodeMetrics(production_loc=tgt_prod, test_loc=tgt_test)
                 coverage = measure_coverage(target, project_dir, log_file)
                 collector.record_coverage(coverage)
 
-            collector.record_target_loc(
-                target_metrics.production_loc,
-                target_metrics.test_loc,
-                target_metrics.module_count if hasattr(target_metrics, "module_count") else 0,
-            )
+            collector.target_metrics = target_metrics
             log(
                 f"Target LOC: {target_metrics.production_loc} prod, "
                 f"{target_metrics.test_loc} test",
@@ -762,24 +899,62 @@ async def run_migration(
         collector.record_idiomaticness(score, reasoning)
 
         # Record I/O contract results
-        # For successful migrations, all test cases pass (I/O validation is blocking)
         total_test_cases = len(config.test_inputs)
-        if migration_status == "success" and total_test_cases > 0:
-            collector.record_io_contract(
-                total_test_cases=total_test_cases,
-                passed=total_test_cases,
-                failed=0,
-                unsupported=0,
-            )
-            log(f"I/O contract: {total_test_cases}/{total_test_cases} passed", log_file)
-        else:
-            # For failures, we don't know exact results - record 0
-            collector.record_io_contract(
-                total_test_cases=total_test_cases,
-                passed=0,
-                failed=0,
-                unsupported=0,
-            )
+        passed_cases = 0
+
+        # Try to parse actual results from PHASE_3_REVIEW.md
+        review_file = Path(project_dir) / "artifacts" / "PHASE_3_REVIEW.md"
+        if review_file.exists():
+            try:
+                review_content = review_file.read_text()
+                # Look for patterns like:
+                # - [x] Tested all I/O contract inputs
+                # - [x] All outputs match expected values exactly
+                # Or more detailed counts if the reviewer provided them
+
+                # Basic check for full pass
+                if (
+                    "[x] Tested all I/O contract inputs" in review_content
+                    and "[x] All outputs match expected values exactly"
+                    in review_content
+                ):
+                    passed_cases = total_test_cases
+                else:
+                    # Try to find specific counts if mentioned, e.g. "20/21 cases passed"
+                    match = re.search(r"(\d+)/(\d+)\s+cases\s+passed", review_content)
+                    if match:
+                        passed_cases = int(match.group(1))
+                        total_found = int(match.group(2))
+                        if total_found > total_test_cases:
+                            total_test_cases = total_found
+                    else:
+                        # Count individual checkmarks in I/O section if they exist
+                        io_section = re.search(
+                            r"### I/O Contract Compliance(.*?)(###|$)",
+                            review_content,
+                            re.DOTALL,
+                        )
+                        if io_section:
+                            passed_cases = io_section.group(1).count("[x]")
+            except Exception as e:
+                log(
+                    f"Warning: Could not parse I/O contract results from review: {e}",
+                    log_file,
+                )
+
+        if passed_cases == 0 and migration_status == "success":
+            # Fallback for success if parsing failed or review doesn't have checkboxes
+            passed_cases = total_test_cases
+
+        failed_cases = max(0, total_test_cases - passed_cases)
+
+        collector.record_io_contract(
+            total_test_cases=total_test_cases,
+            passed=passed_cases,
+            failed=failed_cases,
+            unsupported=0,
+        )
+        log(f"I/O contract: {passed_cases}/{total_test_cases} passed", log_file)
 
     # Finalize and save metrics
     if collector:

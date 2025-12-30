@@ -16,7 +16,7 @@ from .schema import (
     FormattingResult,
     LintingResult,
     QualityGates,
-    TestResult,
+    TestOutcomeResult,
 )
 
 
@@ -452,9 +452,9 @@ class PostHocAnalyzer:
             pass
         return result
 
-    def _run_cargo_test(self, path: Path) -> TestResult:
+    def _run_cargo_test(self, path: Path) -> TestOutcomeResult:
         """Run cargo test and return results."""
-        result = TestResult()
+        result = TestOutcomeResult()
         try:
             proc = subprocess.run(
                 ["cargo", "test", "--", "--format=json", "-Z", "unstable-options"],
@@ -487,14 +487,23 @@ class PostHocAnalyzer:
                 # Look for "test result: ok. X passed; Y failed"
                 import re
 
+                combined_output = proc.stdout + proc.stderr
                 match = re.search(
                     r"(\d+) passed.*?(\d+) failed",
-                    proc.stdout + proc.stderr,
+                    combined_output,
                 )
                 if match:
                     result.passed_count = int(match.group(1))
                     result.failed_count = int(match.group(2))
-                    result.total = result.passed_count + result.failed_count
+
+                # Also look for ignored tests
+                ignored_match = re.search(r"(\d+) ignored", combined_output)
+                if ignored_match:
+                    result.skipped_count = int(ignored_match.group(1))
+
+                result.total = (
+                    result.passed_count + result.failed_count + result.skipped_count
+                )
 
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
@@ -518,16 +527,18 @@ class PostHocAnalyzer:
                 if coverage_file.exists():
                     data = json.loads(coverage_file.read_text())
                     # Extract coverage percentage
+                    # Tarpaulin JSON format has a top-level "files" or similar
+                    # but also often provides a summary.
                     if "coverage" in data:
                         result.line_coverage_pct = data["coverage"]
                     return result
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
             pass
 
         # Fallback: try cargo llvm-cov
         try:
             proc = subprocess.run(
-                ["cargo", "llvm-cov", "--json"],
+                ["cargo", "llvm-cov", "--json", "--summary-only"],
                 cwd=path,
                 capture_output=True,
                 text=True,
@@ -536,12 +547,21 @@ class PostHocAnalyzer:
             if proc.returncode == 0:
                 data = json.loads(proc.stdout)
                 totals = data.get("data", [{}])[0].get("totals", {})
+
+                # Lines
                 lines = totals.get("lines", {})
                 if lines.get("count", 0) > 0:
                     result.line_coverage_pct = lines.get("percent", 0)
+
+                # Functions
                 functions = totals.get("functions", {})
                 if functions.get("count", 0) > 0:
                     result.function_coverage_pct = functions.get("percent", 0)
+
+                # Branches (instantiated as regions in some llvm-cov versions)
+                branches = totals.get("branches", {})
+                if branches.get("count", 0) > 0:
+                    result.branch_coverage_pct = branches.get("percent", 0)
         except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
             pass
 

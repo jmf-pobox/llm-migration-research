@@ -16,7 +16,7 @@ from migration.reporting.schema import (
     MigrationMetrics,
     OutcomeMetrics,
     QualityGates,
-    TestResult,
+    TestOutcomeResult,
     TimingMetrics,
     TokenMetrics,
 )
@@ -73,7 +73,7 @@ def create_test_metrics(
             compilation=None,
             linting=None,
             formatting=None,
-            unit_tests=TestResult(
+            unit_tests=TestOutcomeResult(
                 passed=True, total=5, passed_count=5, failed_count=0, skipped_count=0
             ),
             coverage=CoverageResult(

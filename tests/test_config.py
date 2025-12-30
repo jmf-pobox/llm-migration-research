@@ -62,9 +62,7 @@ class TestLoadProjectConfig:
 
     def test_load_valid_config(self) -> None:
         """Test loading a valid YAML config."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(VALID_CONFIG_YAML)
             f.flush()
 
@@ -78,9 +76,7 @@ class TestLoadProjectConfig:
 
     def test_load_parses_modules(self) -> None:
         """Test that modules are parsed correctly."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(VALID_CONFIG_YAML)
             f.flush()
 
@@ -94,9 +90,7 @@ class TestLoadProjectConfig:
 
     def test_load_parses_io_contract(self) -> None:
         """Test that I/O contract is parsed correctly."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(VALID_CONFIG_YAML)
             f.flush()
 
@@ -108,9 +102,7 @@ class TestLoadProjectConfig:
 
     def test_load_parses_features(self) -> None:
         """Test that features are parsed correctly."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(VALID_CONFIG_YAML)
             f.flush()
 
@@ -128,9 +120,7 @@ class TestLoadProjectConfig:
 
     def test_load_accepts_path_object(self) -> None:
         """Test that Path objects are accepted."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(VALID_CONFIG_YAML)
             f.flush()
 
@@ -168,9 +158,7 @@ source:
   files: []
 modules: []
 """
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(minimal_yaml)
             f.flush()
 

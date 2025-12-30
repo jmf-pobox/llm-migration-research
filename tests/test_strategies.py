@@ -5,9 +5,9 @@ import pytest
 from migration.config import (
     FeatureConfig,
     IOContract,
+    MigrationTestCase,
     ModuleConfig,
     ProjectConfig,
-    TestCase,
 )
 from migration.languages import RustTarget
 from migration.strategies import (
@@ -41,13 +41,13 @@ def create_test_config(with_features: bool = False) -> ProjectConfig:
                 name="addition",
                 description="Addition operator",
                 touches=["lexer.py", "parser.py"],
-                test_cases=[TestCase(input="2 3 +", output="5")],
+                test_cases=[MigrationTestCase(input="2 3 +", output="5")],
             ),
             FeatureConfig(
                 name="multiplication",
                 description="Multiplication operator",
                 touches=["lexer.py", "parser.py"],
-                test_cases=[TestCase(input="2 3 *", output="6")],
+                test_cases=[MigrationTestCase(input="2 3 *", output="6")],
                 depends_on=["addition"],
             ),
         ]

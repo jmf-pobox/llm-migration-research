@@ -12,6 +12,7 @@ Usage:
     python run_migration.py --target rust --project projects/rpn2tex.yaml
     python run_migration.py --target java --project projects/rpn2tex.yaml
     python run_migration.py --target rust --project projects/rpn2tex.yaml --dry-run
+    python run_migration.py --resume /path/to/failed/migration
 """
 
 import argparse
@@ -30,6 +31,7 @@ if not os.environ.get("ANTHROPIC_API_KEY"):
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from migration import load_project_config, run_migration
+from migration.checkpoint import CheckpointManager
 from migration.languages import LANGUAGE_REGISTRY, get_language_target
 from migration.strategies import STRATEGY_REGISTRY, get_strategy
 
@@ -70,7 +72,12 @@ def list_strategies() -> None:
 
 
 async def main_async(
-    target: str, project: str, dry_run: bool, base_dir: str, strategy_name: str | None
+    target: str,
+    project: str,
+    dry_run: bool,
+    base_dir: str,
+    strategy_name: str | None,
+    resume_dir: str | None = None,
 ) -> None:
     """Async main entry point."""
     # Load configuration
@@ -78,6 +85,8 @@ async def main_async(
     lang_target = get_language_target(target)
     strategy = get_strategy(strategy_name) if strategy_name else None
 
+    if resume_dir:
+        print(f"Resuming migration from: {resume_dir}")
     print(f"Migration: {config.name} ({config.source_language}) -> {lang_target.name}")
     print(f"Project config: {project}")
     if strategy:
@@ -92,6 +101,7 @@ async def main_async(
         base_dir=base_dir,
         dry_run=dry_run,
         strategy=strategy,
+        resume_dir=resume_dir,
     )
 
 
@@ -110,6 +120,9 @@ Examples:
 
   # Dry run (show what would happen)
   python run_migration.py --target rust --project projects/rpn2tex.yaml --dry-run
+
+  # Resume a failed migration from checkpoint
+  python run_migration.py --resume /path/to/migration/dir --project projects/rpn2tex.yaml
 
   # List available targets, strategies, and projects
   python run_migration.py --list-targets
@@ -150,6 +163,12 @@ Examples:
         help="Migration strategy to use (default: module-by-module)",
     )
     parser.add_argument(
+        "--resume",
+        "-r",
+        type=str,
+        help="Resume a failed migration from checkpoint directory",
+    )
+    parser.add_argument(
         "--list-targets",
         action="store_true",
         help="List available target languages",
@@ -180,6 +199,33 @@ Examples:
         list_projects()
         return
 
+    # Handle resume mode - can infer target from checkpoint
+    if args.resume:
+        resume_path = Path(args.resume)
+        if not resume_path.exists():
+            print(f"Error: Resume directory not found: {args.resume}")
+            sys.exit(1)
+
+        checkpoint_mgr = CheckpointManager(resume_path)
+        if not checkpoint_mgr.can_resume():
+            print(f"Error: No valid checkpoint found in: {args.resume}")
+            sys.exit(1)
+
+        checkpoint_state = checkpoint_mgr.load()
+        if checkpoint_state is None:
+            print(f"Error: Could not load checkpoint state from: {args.resume}")
+            sys.exit(1)
+
+        # Infer target from checkpoint if not provided
+        if not args.target:
+            args.target = checkpoint_state.target
+            print(f"Inferred target from checkpoint: {args.target}")
+
+        # Infer strategy from checkpoint if not provided
+        if not args.strategy:
+            args.strategy = checkpoint_state.strategy
+            print(f"Inferred strategy from checkpoint: {args.strategy}")
+
     # Validate required arguments for migration
     if not args.target:
         parser.error("--target is required (use --list-targets to see options)")
@@ -206,6 +252,7 @@ Examples:
             dry_run=args.dry_run,
             base_dir=args.base_dir,
             strategy_name=args.strategy,
+            resume_dir=args.resume,
         )
     )
 

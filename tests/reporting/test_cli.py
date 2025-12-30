@@ -93,9 +93,7 @@ class TestCmdReport:
         """Test generating markdown report to stdout."""
         metrics = create_test_metrics()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(metrics.to_json())
             f.flush()
 
@@ -115,9 +113,7 @@ class TestCmdReport:
         """Test generating LaTeX report."""
         metrics = create_test_metrics()
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write(metrics.to_json())
             f.flush()
 
