@@ -1,0 +1,125 @@
+{
+  "identity": {
+    "run_id": "ad30b816-d7f0-460c-97bc-a29aaa9dec85",
+    "project_name": "rpn2tex",
+    "source_language": "python",
+    "target_language": "go",
+    "strategy": "module-by-module",
+    "started_at": "2025-12-29T11:20:08.000942",
+    "completed_at": "2025-12-29T11:57:06.578115",
+    "host_platform": null,
+    "sdk_version": null,
+    "model_id": null
+  },
+  "timing": {
+    "wall_clock_duration_ms": 2216844,
+    "api_duration_ms": 3959734,
+    "phase_durations_ms": {
+      "setup": 2,
+      "migration": 2218305
+    },
+    "module_durations": []
+  },
+  "cost": {
+    "total_cost_usd": 8.993304399999987,
+    "input_tokens_cost_usd": 0.0,
+    "output_tokens_cost_usd": 0.0,
+    "cache_creation_cost_usd": 0.0
+  },
+  "tokens": {
+    "input_tokens": 13,
+    "output_tokens": 10291,
+    "cache_creation_input_tokens": 108756,
+    "cache_read_input_tokens": 151472,
+    "cache_efficiency_ratio": 0.9999141829224015
+  },
+  "agent": {
+    "total_turns": 17,
+    "total_messages": 1009,
+    "subagent_invocations": {
+      "io_contract": 1,
+      "analyst": 1,
+      "migrator": 7,
+      "reviewer": 7
+    },
+    "tool_invocations": {
+      "Task": 16,
+      "Read": 119,
+      "Bash": 291,
+      "Write": 48,
+      "Glob": 16,
+      "Edit": 1
+    },
+    "error_recovery_events": 0,
+    "retry_count": 0
+  },
+  "source_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "target_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "quality_gates": {
+    "compilation": {
+      "passed": false,
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "linting": {
+      "passed": false,
+      "tool": "",
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "formatting": {
+      "passed": false,
+      "tool": ""
+    },
+    "unit_tests": {
+      "passed": false,
+      "total": 0,
+      "passed_count": 0,
+      "failed_count": 0,
+      "skipped_count": 0
+    },
+    "coverage": {
+      "line_coverage_pct": 64.9,
+      "function_coverage_pct": null,
+      "branch_coverage_pct": null
+    }
+  },
+  "io_contract": {
+    "total_test_cases": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "feature_results": [],
+    "match_rate_pct": 0.0
+  },
+  "outcome": {
+    "status": "success",
+    "modules_completed": 0,
+    "modules_total": 0,
+    "blocking_issues": [],
+    "notes": null
+  },
+  "schema_version": "1.0.0",
+  "loc_expansion_ratio": 0.0,
+  "cost_per_loc": 0.0
+}

@@ -1,48 +1,25 @@
-package rpn2tex
+package main
 
-import "fmt"
-
-// TokenType represents the type of a lexical token.
+// TokenType represents the type of a lexical token
 type TokenType int
 
 const (
-	TokenNumber TokenType = iota
-	TokenPlus
-	TokenMinus
-	TokenTimes
-	TokenDivide
-	TokenEOF
+	// NUMBER represents numeric literals (integers and decimals)
+	NUMBER TokenType = iota
+	// PLUS represents the addition operator (+)
+	PLUS
+	// MINUS represents the subtraction operator (-)
+	MINUS
+	// MULTIPLY represents the multiplication operator (*)
+	MULTIPLY
+	// DIVIDE represents the division operator (/)
+	DIVIDE
 )
 
-// Token represents a lexical token with position information.
+// Token represents a lexical token with position information
 type Token struct {
 	Type   TokenType
 	Value  string
-	Line   int // 1-based
-	Column int // 1-based
-}
-
-// String returns a string representation of the token for debugging.
-func (t Token) String() string {
-	return fmt.Sprintf("Token(%s, %q, %d, %d)", t.Type, t.Value, t.Line, t.Column)
-}
-
-// String returns a string representation of the token type.
-func (tt TokenType) String() string {
-	switch tt {
-	case TokenNumber:
-		return "NUMBER"
-	case TokenPlus:
-		return "PLUS"
-	case TokenMinus:
-		return "MINUS"
-	case TokenTimes:
-		return "TIMES"
-	case TokenDivide:
-		return "DIVIDE"
-	case TokenEOF:
-		return "EOF"
-	default:
-		return "UNKNOWN"
-	}
+	Line   int
+	Column int
 }

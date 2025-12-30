@@ -1,31 +1,19 @@
 package com.rpn2tex;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
- * Stack-based RPN parser.
+ * RPN Parser that converts a list of tokens into an abstract syntax tree (AST).
  *
- * <p>Converts a token stream into an Abstract Syntax Tree.
- * Uses a stack to accumulate operands and build expression trees
- * when operators are encountered.
+ * <p>Uses stack-based evaluation to parse Reverse Polish Notation expressions:
+ * - Numbers are pushed onto the stack
+ * - Operators pop two operands, create a BinaryOp node, and push the result
+ * - Final validation ensures exactly one value remains on the stack
  *
- * <p>RPN Parsing Algorithm:
- * <ol>
- *   <li>When you see a number, push it onto the stack</li>
- *   <li>When you see an operator, pop operands, create a node, push result</li>
- *   <li>At EOF, the stack should contain exactly one element: the AST root</li>
- * </ol>
+ * <p>Example: "5 3 +" becomes BinaryOp("+", Number(5), Number(3))
  *
- * <p>Example usage:
- * <pre>
- *   Lexer lexer = new Lexer("5 3 +");
- *   List&lt;Token&gt; tokens = lexer.tokenize();
- *   ASTNode ast = new Parser(tokens).parse();
- *   // Result: BinaryOpNode("+", NumberNode("5"), NumberNode("3"))
- * </pre>
+ * @see Expr
+ * @see Token
  */
 public class Parser {
     private final List<Token> tokens;
@@ -34,83 +22,104 @@ public class Parser {
     /**
      * Creates a new parser for the given token list.
      *
-     * @param tokens list of tokens from lexer (must end with EOF)
-     * @throws NullPointerException if tokens is null
+     * @param tokens the list of tokens to parse (must include EOF token)
      */
     public Parser(List<Token> tokens) {
-        this.tokens = Objects.requireNonNull(tokens, "tokens must not be null");
+        this.tokens = tokens;
         this.pos = 0;
     }
 
     /**
-     * Parses tokens into an AST.
+     * Parses the token list into an expression tree.
      *
-     * @return the root expression node of the AST
-     * @throws ParserException if the input is invalid RPN
+     * @return the root expression node
+     * @throws RpnException if the expression is invalid (empty or extra values)
      */
-    public ASTNode parse() throws ParserException {
-        Deque<ASTNode> stack = new ArrayDeque<>();
+    public Expr parse() throws RpnException {
+        Stack<Expr> stack = new Stack<>();
 
         while (!atEnd()) {
             Token token = current();
 
-            if (token.type() == TokenType.NUMBER) {
-                // Push number onto stack
-                NumberNode numNode = new NumberNode(
-                    token.line(),
-                    token.column(),
-                    token.value()
-                );
-                stack.push(numNode);
+            if (token.type == TokenType.NUMBER) {
+                stack.push(new Number(token.value, token.line, token.column));
                 advance();
-            } else if (token.type() == TokenType.PLUS
-                       || token.type() == TokenType.MINUS
-                       || token.type() == TokenType.MULT
-                       || token.type() == TokenType.DIV) {
-                // Binary operator: pop two operands and create BinaryOpNode
+
+            } else if (token.type == TokenType.PLUS) {
+                // Binary operator requires two operands
                 if (stack.size() < 2) {
-                    throw new ParserException(
-                        String.format("Operator '%s' requires two operands", token.value()),
-                        token
+                    throw new RpnException(
+                        "Operator '+' requires two operands",
+                        token.line,
+                        token.column
                     );
                 }
-
-                ASTNode right = stack.pop();
-                ASTNode left = stack.pop();
-
-                BinaryOpNode opNode = new BinaryOpNode(
-                    token.line(),
-                    token.column(),
-                    token.value(),  // Use token value (+, -, or *)
-                    left,
-                    right
-                );
-                stack.push(opNode);
+                // Pop right then left (order matters!)
+                Expr right = stack.pop();
+                Expr left = stack.pop();
+                stack.push(new BinaryOp("+", left, right, token.line, token.column));
                 advance();
-            } else if (token.type() == TokenType.EOF) {
+
+            } else if (token.type == TokenType.MINUS) {
+                // Binary operator requires two operands
+                if (stack.size() < 2) {
+                    throw new RpnException(
+                        "Operator '-' requires two operands",
+                        token.line,
+                        token.column
+                    );
+                }
+                // Pop right then left (order matters for subtraction!)
+                Expr right = stack.pop();
+                Expr left = stack.pop();
+                stack.push(new BinaryOp("-", left, right, token.line, token.column));
+                advance();
+
+            } else if (token.type == TokenType.STAR) {
+                // Binary operator requires two operands
+                if (stack.size() < 2) {
+                    throw new RpnException(
+                        "Operator '*' requires two operands",
+                        token.line,
+                        token.column
+                    );
+                }
+                // Pop right then left
+                Expr right = stack.pop();
+                Expr left = stack.pop();
+                stack.push(new BinaryOp("*", left, right, token.line, token.column));
+                advance();
+
+            } else if (token.type == TokenType.SLASH) {
+                // Binary operator requires two operands
+                if (stack.size() < 2) {
+                    throw new RpnException(
+                        "Operator '/' requires two operands",
+                        token.line,
+                        token.column
+                    );
+                }
+                // Pop right then left (order matters for division!)
+                Expr right = stack.pop();
+                Expr left = stack.pop();
+                stack.push(new BinaryOp("/", left, right, token.line, token.column));
+                advance();
+
+            } else if (token.type == TokenType.EOF) {
                 break;
-            } else {
-                throw new ParserException(
-                    String.format("Unexpected token '%s'", token.value()),
-                    token
-                );
             }
         }
 
-        // Validate final state
         if (stack.isEmpty()) {
             Token eofToken = tokens.get(tokens.size() - 1);
-            throw new ParserException("Empty expression", eofToken);
+            throw new RpnException("Empty expression", eofToken.line, eofToken.column);
         }
 
         if (stack.size() > 1) {
             Token eofToken = tokens.get(tokens.size() - 1);
-            throw new ParserException(
-                String.format(
-                    "Invalid RPN: %d values remain on stack (missing operators?)",
-                    stack.size()
-                ),
-                eofToken
+            throw new RpnException(
+                "Invalid RPN: " + stack.size() + " values remain on stack (missing operators?)",
+                eofToken.line, eofToken.column
             );
         }
 
@@ -122,7 +131,7 @@ public class Parser {
     }
 
     private boolean atEnd() {
-        return tokens.get(pos).type() == TokenType.EOF;
+        return tokens.get(pos).type == TokenType.EOF;
     }
 
     private void advance() {

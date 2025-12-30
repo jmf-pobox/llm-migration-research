@@ -1,42 +1,52 @@
 package com.rpn2tex;
 
-import java.util.Objects;
-
 /**
- * A lexical token with type, value, and position.
+ * Represents a token in an RPN expression.
  *
- * <p>Tokens are immutable value objects that represent lexical elements
- * scanned from the input text. Each token tracks its position for
- * error reporting.
+ * <p>Tokens are immutable objects that represent the smallest units of an RPN expression.
+ * Each token has a type, optional value, and source location (line and column).
  *
- * <p>Example:
+ * <p>Example usage:
  * <pre>
- *   Token token = new Token(TokenType.NUMBER, "42", 1, 5);
+ * Token numberToken = new Token(TokenType.NUMBER, "42", 1, 1);
  * </pre>
- *
- * @param type the token type (from TokenType enum)
- * @param value the string value of the token
- * @param line line number (1-based) where token appears
- * @param column column number (1-based) where token starts
  */
-public record Token(TokenType type, String value, int line, int column) {
+public final class Token {
+    /** The type of this token. */
+    public final TokenType type;
+
+    /** The string value of this token (e.g., "42"). */
+    public final String value;
+
+    /** The 1-based line number where this token appears. */
+    public final int line;
+
+    /** The 1-based column number where this token appears. */
+    public final int column;
 
     /**
      * Creates a new token.
      *
-     * @param type the token type (from TokenType enum)
+     * @param type the type of token
      * @param value the string value of the token
-     * @param line line number (1-based) where token appears
-     * @param column column number (1-based) where token starts
-     * @throws NullPointerException if type or value is null
+     * @param line the 1-based line number
+     * @param column the 1-based column number
      */
-    public Token {
-        Objects.requireNonNull(type, "type must not be null");
-        Objects.requireNonNull(value, "value must not be null");
+    public Token(TokenType type, String value, int line, int column) {
+        this.type = type;
+        this.value = value;
+        this.line = line;
+        this.column = column;
     }
 
+    /**
+     * Returns a string representation of this token for debugging.
+     *
+     * @return a string in the format "Token(TYPE, 'value', line:column)"
+     */
     @Override
     public String toString() {
-        return String.format("Token(%s, '%s', %d:%d)", type, value, line, column);
+        return String.format("Token(%s, '%s', %d:%d)",
+            type.name(), value, line, column);
     }
 }

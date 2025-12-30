@@ -1,10 +1,8 @@
-// Package rpn2tex implements a converter from Reverse Polish Notation to LaTeX.
-package rpn2tex
+package main
 
 import "fmt"
 
-// ParserError represents an error that occurred during parsing.
-// It includes the error message and the token where the error occurred.
+// ParserError represents a parsing error with the token where the error occurred.
 type ParserError struct {
 	Message string
 	Token   Token
@@ -16,96 +14,89 @@ func (e *ParserError) Error() string {
 		e.Message, e.Token.Line, e.Token.Column)
 }
 
-// Parser converts a stream of tokens into an Abstract Syntax Tree (AST)
-// using a stack-based algorithm for Reverse Polish Notation (RPN).
+// Parser parses a sequence of tokens into an abstract syntax tree using
+// stack-based evaluation for Reverse Polish Notation (RPN).
 type Parser struct {
-	tokens []Token
-	pos    int
+	Tokens []Token
+	Pos    int
 }
 
-// NewParser creates a new Parser with the given token stream.
+// NewParser creates a new Parser with the given token list.
 func NewParser(tokens []Token) *Parser {
 	return &Parser{
-		tokens: tokens,
-		pos:    0,
+		Tokens: tokens,
+		Pos:    0,
 	}
 }
 
-// Parse parses the token stream and returns an AST expression.
-// It implements a stack-based RPN parsing algorithm:
-// 1. For each number token, create a Number node and push to stack
-// 2. For each operator token, pop two operands, create BinaryOp, push result
-// 3. At EOF, validate that exactly one expression remains on stack
-//
-// Returns an error if:
-// - The expression is empty
-// - An operator has insufficient operands
-// - Multiple values remain on stack (missing operators)
+// Parse parses the token stream into an AST expression tree.
+// It implements stack-based RPN parsing:
+// - NUMBER tokens are pushed as Number nodes onto the stack
+// - OPERATOR tokens pop two operands, create a BinaryOp, and push the result
+// - At EOF, the stack must contain exactly one expression
 func (p *Parser) Parse() (Expr, error) {
-	var stack []Expr
+	stack := []Expr{}
 
 	for !p.atEnd() {
 		token := p.current()
+		p.advance()
 
 		switch token.Type {
 		case NUMBER:
-			// Create Number node and push to stack
+			// Push number node onto stack
 			node := &Number{
 				Line:   token.Line,
 				Column: token.Column,
 				Value:  token.Value,
 			}
 			stack = append(stack, node)
-			p.advance()
 
 		case PLUS, MINUS, MULT, DIV:
-			// Check for sufficient operands
+			// Pop two operands, create binary operation, push result
 			if len(stack) < 2 {
 				return nil, &ParserError{
-					Message: fmt.Sprintf("Operator '%s' requires two operands", token.Value),
+					Message: fmt.Sprintf("Not enough operands for operator '%s'", token.Value),
 					Token:   token,
 				}
 			}
 
-			// Pop right operand (last pushed, popped first)
+			// Pop right operand (top of stack)
 			right := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 
-			// Pop left operand (first pushed, popped second)
+			// Pop left operand (new top of stack)
 			left := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 
-			// Create BinaryOp node
+			// Map token type to operator string
+			operator := p.tokenTypeToOperator(token.Type)
+
+			// Create binary operation node
 			node := &BinaryOp{
 				Line:     token.Line,
 				Column:   token.Column,
-				Operator: token.Value,
+				Operator: operator,
 				Left:     left,
 				Right:    right,
 			}
 			stack = append(stack, node)
-			p.advance()
 
 		case EOF:
-			// End of token stream
+			// Stop processing at EOF
 			break
 
 		default:
-			// Unexpected token type (should not occur with valid lexer)
 			return nil, &ParserError{
-				Message: fmt.Sprintf("Unexpected token type %s", token.Type),
+				Message: fmt.Sprintf("Unexpected token type: %s", token.Type),
 				Token:   token,
 			}
 		}
 	}
 
-	// Validate stack has exactly one element
+	// Validate the final stack
 	if len(stack) == 0 {
-		// Find EOF token for error reporting
-		eofToken := Token{Type: EOF, Value: "", Line: 1, Column: 1}
-		if len(p.tokens) > 0 {
-			eofToken = p.tokens[len(p.tokens)-1]
-		}
+		// Use the EOF token for error reporting
+		eofToken := p.Tokens[len(p.Tokens)-1]
 		return nil, &ParserError{
 			Message: "Empty expression",
 			Token:   eofToken,
@@ -113,14 +104,12 @@ func (p *Parser) Parse() (Expr, error) {
 	}
 
 	if len(stack) > 1 {
-		// Find EOF token for error reporting
-		eofToken := Token{Type: EOF, Value: "", Line: 1, Column: 1}
-		if len(p.tokens) > 0 {
-			eofToken = p.tokens[len(p.tokens)-1]
-		}
+		// Multiple items left means missing operators
+		// Use the position of the second-to-last token
+		lastToken := p.Tokens[len(p.Tokens)-2]
 		return nil, &ParserError{
-			Message: fmt.Sprintf("Invalid RPN: %d values remain on stack (missing operators?)", len(stack)),
-			Token:   eofToken,
+			Message: fmt.Sprintf("Too many operands (missing operators): %d items left on stack", len(stack)),
+			Token:   lastToken,
 		}
 	}
 
@@ -129,34 +118,39 @@ func (p *Parser) Parse() (Expr, error) {
 
 // current returns the current token without advancing.
 func (p *Parser) current() Token {
-	if p.pos >= len(p.tokens) {
-		// Return EOF token if past end
-		if len(p.tokens) > 0 {
-			lastToken := p.tokens[len(p.tokens)-1]
-			return Token{
-				Type:   EOF,
-				Value:  "",
-				Line:   lastToken.Line,
-				Column: lastToken.Column,
-			}
-		}
-		return Token{Type: EOF, Value: "", Line: 1, Column: 1}
+	if p.Pos >= len(p.Tokens) {
+		// Return EOF token if past the end
+		return Token{Type: EOF, Value: "", Line: 0, Column: 0}
 	}
-	return p.tokens[p.pos]
+	return p.Tokens[p.Pos]
 }
 
-// atEnd checks if we're at the end of the token stream or at EOF token.
+// atEnd checks if the parser is at the end of the token stream.
 func (p *Parser) atEnd() bool {
-	if p.pos >= len(p.tokens) {
-		return true
-	}
-	return p.tokens[p.pos].Type == EOF
+	return p.Pos >= len(p.Tokens) || p.current().Type == EOF
 }
 
-// advance moves to the next token.
+// advance moves to the next token and returns the previous current token.
 func (p *Parser) advance() Token {
-	if !p.atEnd() {
-		p.pos++
+	token := p.current()
+	if p.Pos < len(p.Tokens) {
+		p.Pos++
 	}
-	return p.current()
+	return token
+}
+
+// tokenTypeToOperator converts a TokenType to its operator string.
+func (p *Parser) tokenTypeToOperator(tt TokenType) string {
+	switch tt {
+	case PLUS:
+		return "+"
+	case MINUS:
+		return "-"
+	case MULT:
+		return "*"
+	case DIV:
+		return "/"
+	default:
+		return ""
+	}
 }

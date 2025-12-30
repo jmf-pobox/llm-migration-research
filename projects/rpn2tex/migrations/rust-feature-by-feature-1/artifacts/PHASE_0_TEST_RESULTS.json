@@ -1,0 +1,479 @@
+{
+  "execution_date": "2025-12-29T14:04:21.866639",
+  "total_tests": 23,
+  "passed": 20,
+  "failed": 3,
+  "success_rate": 86.95652173913044,
+  "feature_stats": {
+    "numbers": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "numbers",
+          "input": "5",
+          "expected": "$5$",
+          "actual": "$5$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "numbers",
+          "input": "3.14",
+          "expected": "$3.14$",
+          "actual": "$3.14$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "addition": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "addition",
+          "input": "5 3 +",
+          "expected": "$5 + 3$",
+          "actual": "$5 + 3$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "addition",
+          "input": "1 2 + 3 + 4 +",
+          "expected": "$1 + 2 + 3 + 4$",
+          "actual": "$1 + 2 + 3 + 4$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "subtraction": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "subtraction",
+          "input": "5 3 -",
+          "expected": "$5 - 3$",
+          "actual": "$5 - 3$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "subtraction",
+          "input": "5 3 - 2 -",
+          "expected": "$5 - 3 - 2$",
+          "actual": "$5 - 3 - 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "multiplication": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "multiplication",
+          "input": "4 7 *",
+          "expected": "$4 \\times 7$",
+          "actual": "$4 \\times 7$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "multiplication",
+          "input": "2 3 4 * +",
+          "expected": "$2 + 3 \\times 4$",
+          "actual": "$2 + 3 \\times 4$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "division": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "division",
+          "input": "10 2 /",
+          "expected": "$10 \\div 2$",
+          "actual": "$10 \\div 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "division",
+          "input": "100 10 / 5 / 2 /",
+          "expected": "$100 \\div 10 \\div 5 \\div 2$",
+          "actual": "$100 \\div 10 \\div 5 \\div 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "precedence": {
+      "passed": 5,
+      "total": 5,
+      "tests": [
+        {
+          "feature": "precedence",
+          "input": "5 3 + 2 *",
+          "expected": "$( 5 + 3 ) \\times 2$",
+          "actual": "$( 5 + 3 ) \\times 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "precedence",
+          "input": "2 3 + 4 *",
+          "expected": "$( 2 + 3 ) \\times 4$",
+          "actual": "$( 2 + 3 ) \\times 4$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "precedence",
+          "input": "2 3 4 + *",
+          "expected": "$2 \\times ( 3 + 4 )$",
+          "actual": "$2 \\times ( 3 + 4 )$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "precedence",
+          "input": "1 2 + 3 4 + *",
+          "expected": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+          "actual": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "precedence",
+          "input": "10 2 / 3 + 4 *",
+          "expected": "$( 10 \\div 2 + 3 ) \\times 4$",
+          "actual": "$( 10 \\div 2 + 3 ) \\times 4$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "mixed_operators": {
+      "passed": 3,
+      "total": 3,
+      "tests": [
+        {
+          "feature": "mixed_operators",
+          "input": "5 3 * 2 +",
+          "expected": "$5 \\times 3 + 2$",
+          "actual": "$5 \\times 3 + 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "mixed_operators",
+          "input": "10 2 / 5 *",
+          "expected": "$10 \\div 2 \\times 5$",
+          "actual": "$10 \\div 2 \\times 5$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "mixed_operators",
+          "input": "2 3 * 4 +",
+          "expected": "$2 \\times 3 + 4$",
+          "actual": "$2 \\times 3 + 4$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "floating_point": {
+      "passed": 2,
+      "total": 2,
+      "tests": [
+        {
+          "feature": "floating_point",
+          "input": "3.14 2 *",
+          "expected": "$3.14 \\times 2$",
+          "actual": "$3.14 \\times 2$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        },
+        {
+          "feature": "floating_point",
+          "input": "1.5 0.5 +",
+          "expected": "$1.5 + 0.5$",
+          "actual": "$1.5 + 0.5$",
+          "stderr": "",
+          "returncode": 0,
+          "passed": true
+        }
+      ]
+    },
+    "exponentiation": {
+      "passed": 0,
+      "total": 3,
+      "tests": [
+        {
+          "feature": "exponentiation",
+          "input": "2 3 ^",
+          "expected": "$2^{3}$",
+          "actual": "",
+          "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^\n  |     ^",
+          "returncode": 1,
+          "passed": false
+        },
+        {
+          "feature": "exponentiation",
+          "input": "2 3 ^ 4 *",
+          "expected": "$2^{3} \\times 4$",
+          "actual": "",
+          "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^ 4 *\n  |     ^",
+          "returncode": 1,
+          "passed": false
+        },
+        {
+          "feature": "exponentiation",
+          "input": "2 3 4 ^ ^",
+          "expected": "$2^{3^{4}}$",
+          "actual": "",
+          "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 4 ^ ^\n  |       ^",
+          "returncode": 1,
+          "passed": false
+        }
+      ]
+    }
+  },
+  "all_results": [
+    {
+      "feature": "numbers",
+      "input": "5",
+      "expected": "$5$",
+      "actual": "$5$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "numbers",
+      "input": "3.14",
+      "expected": "$3.14$",
+      "actual": "$3.14$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "addition",
+      "input": "5 3 +",
+      "expected": "$5 + 3$",
+      "actual": "$5 + 3$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "addition",
+      "input": "1 2 + 3 + 4 +",
+      "expected": "$1 + 2 + 3 + 4$",
+      "actual": "$1 + 2 + 3 + 4$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "subtraction",
+      "input": "5 3 -",
+      "expected": "$5 - 3$",
+      "actual": "$5 - 3$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "subtraction",
+      "input": "5 3 - 2 -",
+      "expected": "$5 - 3 - 2$",
+      "actual": "$5 - 3 - 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "multiplication",
+      "input": "4 7 *",
+      "expected": "$4 \\times 7$",
+      "actual": "$4 \\times 7$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "multiplication",
+      "input": "2 3 4 * +",
+      "expected": "$2 + 3 \\times 4$",
+      "actual": "$2 + 3 \\times 4$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "division",
+      "input": "10 2 /",
+      "expected": "$10 \\div 2$",
+      "actual": "$10 \\div 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "division",
+      "input": "100 10 / 5 / 2 /",
+      "expected": "$100 \\div 10 \\div 5 \\div 2$",
+      "actual": "$100 \\div 10 \\div 5 \\div 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "precedence",
+      "input": "5 3 + 2 *",
+      "expected": "$( 5 + 3 ) \\times 2$",
+      "actual": "$( 5 + 3 ) \\times 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "precedence",
+      "input": "2 3 + 4 *",
+      "expected": "$( 2 + 3 ) \\times 4$",
+      "actual": "$( 2 + 3 ) \\times 4$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "precedence",
+      "input": "2 3 4 + *",
+      "expected": "$2 \\times ( 3 + 4 )$",
+      "actual": "$2 \\times ( 3 + 4 )$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "precedence",
+      "input": "1 2 + 3 4 + *",
+      "expected": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "actual": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "precedence",
+      "input": "10 2 / 3 + 4 *",
+      "expected": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "actual": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "mixed_operators",
+      "input": "5 3 * 2 +",
+      "expected": "$5 \\times 3 + 2$",
+      "actual": "$5 \\times 3 + 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "mixed_operators",
+      "input": "10 2 / 5 *",
+      "expected": "$10 \\div 2 \\times 5$",
+      "actual": "$10 \\div 2 \\times 5$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "mixed_operators",
+      "input": "2 3 * 4 +",
+      "expected": "$2 \\times 3 + 4$",
+      "actual": "$2 \\times 3 + 4$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "floating_point",
+      "input": "3.14 2 *",
+      "expected": "$3.14 \\times 2$",
+      "actual": "$3.14 \\times 2$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "floating_point",
+      "input": "1.5 0.5 +",
+      "expected": "$1.5 + 0.5$",
+      "actual": "$1.5 + 0.5$",
+      "stderr": "",
+      "returncode": 0,
+      "passed": true
+    },
+    {
+      "feature": "exponentiation",
+      "input": "2 3 ^",
+      "expected": "$2^{3}$",
+      "actual": "",
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^\n  |     ^",
+      "returncode": 1,
+      "passed": false
+    },
+    {
+      "feature": "exponentiation",
+      "input": "2 3 ^ 4 *",
+      "expected": "$2^{3} \\times 4$",
+      "actual": "",
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^ 4 *\n  |     ^",
+      "returncode": 1,
+      "passed": false
+    },
+    {
+      "feature": "exponentiation",
+      "input": "2 3 4 ^ ^",
+      "expected": "$2^{3^{4}}$",
+      "actual": "",
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 4 ^ ^\n  |       ^",
+      "returncode": 1,
+      "passed": false
+    }
+  ]
+}

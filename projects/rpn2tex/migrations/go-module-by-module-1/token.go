@@ -1,23 +1,21 @@
-// Package rpn2tex provides tools for converting Reverse Polish Notation (RPN)
-// expressions to LaTeX math mode output.
-package rpn2tex
+package main
 
 import "fmt"
 
-// TokenType represents the type of a lexical token.
+// TokenType represents the type of a lexical token in the RPN expression.
 type TokenType int
 
-// Token type constants define all lexical token types used by the lexer.
+// Token types supported by the rpn2tex lexer.
 const (
-	NUMBER TokenType = iota // Numeric literal (integer or decimal)
-	PLUS                    // Addition operator '+'
-	MINUS                   // Subtraction operator '-' or negative sign
-	MULT                    // Multiplication operator '*'
-	DIV                     // Division operator '/'
-	EOF                     // End of file/input marker
+	NUMBER TokenType = iota
+	PLUS
+	MINUS
+	MULT
+	DIV
+	EOF
 )
 
-// String returns a human-readable string representation of the token type.
+// String returns the string representation of a TokenType.
 func (tt TokenType) String() string {
 	switch tt {
 	case NUMBER:
@@ -37,16 +35,17 @@ func (tt TokenType) String() string {
 	}
 }
 
-// Token represents a lexical token with its type, value, and position in the source.
-// Position tracking uses 1-based line and column numbers for human-readable error messages.
+// Token represents a lexical token with position information.
+// It is immutable by design - all fields are read-only after creation.
 type Token struct {
-	Type   TokenType // The type of token
-	Value  string    // The raw string value of the token
-	Line   int       // Line number (1-based)
-	Column int       // Column number (1-based)
+	Type   TokenType
+	Value  string
+	Line   int
+	Column int
 }
 
-// String returns a formatted string representation of the token for debugging.
+// String returns the string representation of a Token for debugging.
+// Format: Token(TYPE, "value", line:column)
 func (t Token) String() string {
-	return fmt.Sprintf("Token(%s, %q, %d, %d)", t.Type, t.Value, t.Line, t.Column)
+	return fmt.Sprintf("Token(%s, %q, %d:%d)", t.Type, t.Value, t.Line, t.Column)
 }

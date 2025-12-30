@@ -30,8 +30,8 @@ if not os.environ.get("ANTHROPIC_API_KEY"):
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from migration import load_project_config, run_migration
-from migration.languages import get_language_target, LANGUAGE_REGISTRY
-from migration.strategies import get_strategy, STRATEGY_REGISTRY
+from migration.languages import LANGUAGE_REGISTRY, get_language_target
+from migration.strategies import STRATEGY_REGISTRY, get_strategy
 
 
 def list_languages() -> None:
@@ -199,13 +199,15 @@ Examples:
             sys.exit(1)
 
     # Run migration
-    asyncio.run(main_async(
-        target=args.target,
-        project=str(project_path),
-        dry_run=args.dry_run,
-        base_dir=args.base_dir,
-        strategy_name=args.strategy,
-    ))
+    asyncio.run(
+        main_async(
+            target=args.target,
+            project=str(project_path),
+            dry_run=args.dry_run,
+            base_dir=args.base_dir,
+            strategy_name=args.strategy,
+        )
+    )
 
 
 if __name__ == "__main__":

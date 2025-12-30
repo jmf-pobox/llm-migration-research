@@ -1,43 +1,57 @@
-//! Error types for rpn2tex.
+//! Error types for RPN to LaTeX conversion.
 //!
-//! This module defines error types for lexer and parser errors with
-//! position information for helpful error messages.
+//! This module defines error types used throughout the conversion pipeline.
 
 use std::error::Error;
 use std::fmt;
 
-use crate::tokens::Token;
+use crate::Token;
 
-/// Error that occurs during lexical analysis.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::error::LexerError;
-///
-/// let err = LexerError::new("Unexpected character '@'".to_string(), 1, 5);
-/// assert_eq!(err.line, 1);
-/// assert_eq!(err.column, 5);
-/// ```
+/// An error that occurred during lexical analysis.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub struct LexerError {
-    /// Description of the error
-    pub message: String,
-    /// Line number where error occurred (1-based)
-    pub line: usize,
-    /// Column number where error occurred (1-based)
-    pub column: usize,
+    message: String,
+    line: usize,
+    column: usize,
 }
 
 impl LexerError {
-    /// Create a new lexer error.
-    #[must_use]
-    pub fn new(message: String, line: usize, column: usize) -> Self {
+    /// Creates a new lexer error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rpn2tex::LexerError;
+    ///
+    /// let error = LexerError::new("Unexpected character", 1, 5);
+    /// assert_eq!(error.line(), 1);
+    /// assert_eq!(error.column(), 5);
+    /// ```
+    pub fn new(message: impl Into<String>, line: usize, column: usize) -> Self {
         Self {
-            message,
+            message: message.into(),
             line,
             column,
         }
+    }
+
+    /// Returns the error message.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Returns the line number where the error occurred.
+    #[must_use]
+    pub const fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Returns the column number where the error occurred.
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
     }
 }
 
@@ -45,7 +59,7 @@ impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Line {}, column {}: {}",
+            "Lexer error at {}:{}: {}",
             self.line, self.column, self.message
         )
     }
@@ -53,30 +67,41 @@ impl fmt::Display for LexerError {
 
 impl Error for LexerError {}
 
-/// Error that occurs during parsing.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::error::ParserError;
-/// use rpn2tex::tokens::{Token, TokenType};
-///
-/// let token = Token::new(TokenType::Eof, "".to_string(), 1, 5);
-/// let err = ParserError::new("Empty expression".to_string(), token);
-/// ```
+/// An error that occurred during parsing.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub struct ParserError {
-    /// Description of the error
-    pub message: String,
-    /// The token where error occurred
-    pub token: Token,
+    message: String,
+    token: Token,
 }
 
 impl ParserError {
-    /// Create a new parser error.
+    /// Creates a new parser error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rpn2tex::{ParserError, Token, TokenType};
+    ///
+    /// let token = Token::new(TokenType::Eof, "", 1, 5);
+    /// let error = ParserError::new("Unexpected end of input", token);
+    /// ```
+    pub fn new(message: impl Into<String>, token: Token) -> Self {
+        Self {
+            message: message.into(),
+            token,
+        }
+    }
+
+    /// Returns the error message.
     #[must_use]
-    pub fn new(message: String, token: Token) -> Self {
-        Self { message, token }
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Returns the token where the error occurred.
+    pub fn token(&self) -> &Token {
+        &self.token
     }
 }
 
@@ -84,88 +109,53 @@ impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{} at line {}, column {}",
-            self.message, self.token.line, self.token.column
+            "Parser error at {}:{}: {}",
+            self.token.line(),
+            self.token.column(),
+            self.message
         )
     }
 }
 
 impl Error for ParserError {}
 
-/// Formats errors with source context.
-///
-/// Provides gcc/rustc-style error output with line numbers and caret positioning.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::error::ErrorFormatter;
-///
-/// let formatter = ErrorFormatter::new("5 3 +");
-/// let formatted = formatter.format_error("Test error", 1, 5);
-/// assert!(formatted.contains("^"));
-/// ```
-#[derive(Debug, Clone)]
-pub struct ErrorFormatter {
-    lines: Vec<String>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TokenType;
 
-impl ErrorFormatter {
-    /// Create a new error formatter with source text.
-    #[must_use]
-    pub fn new(source: impl Into<String>) -> Self {
-        let source = source.into();
-        let lines = source.lines().map(String::from).collect();
-        Self { lines }
+    #[test]
+    fn test_lexer_error() {
+        let error = LexerError::new("Invalid character", 2, 10);
+        assert_eq!(error.message(), "Invalid character");
+        assert_eq!(error.line(), 2);
+        assert_eq!(error.column(), 10);
     }
 
-    /// Format an error with source context.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::error::ErrorFormatter;
-    ///
-    /// let formatter = ErrorFormatter::new("5 3 @");
-    /// let output = formatter.format_error("Unexpected character '@'", 1, 5);
-    /// assert!(output.contains("Error:"));
-    /// assert!(output.contains("^"));
-    /// ```
-    #[must_use]
-    pub fn format_error(&self, message: &str, line: usize, column: usize) -> String {
-        let mut parts = vec![format!("Error: {message}"), String::new()];
-
-        let context = self.get_context(line, column, 1);
-        parts.push(context);
-
-        parts.join("\n")
+    #[test]
+    fn test_lexer_error_display() {
+        let error = LexerError::new("Test error", 1, 5);
+        let display = format!("{}", error);
+        assert!(display.contains("Lexer error"));
+        assert!(display.contains("1:5"));
+        assert!(display.contains("Test error"));
     }
 
-    fn get_context(&self, line: usize, column: usize, context_lines: usize) -> String {
-        let error_idx = line.saturating_sub(1);
-        let start_idx = error_idx.saturating_sub(context_lines);
-        let end_idx = (error_idx + context_lines + 1).min(self.lines.len());
+    #[test]
+    fn test_parser_error() {
+        let token = Token::new(TokenType::Number, "42", 1, 1);
+        let error = ParserError::new("Stack underflow", token.clone());
+        assert_eq!(error.message(), "Stack underflow");
+        assert_eq!(error.token(), &token);
+    }
 
-        let max_line_num = end_idx;
-        let num_width = max_line_num.to_string().len();
-
-        let mut result_lines = Vec::new();
-
-        for idx in start_idx..end_idx {
-            let line_num = idx + 1;
-            let line_content = self.lines.get(idx).map_or("", String::as_str);
-
-            let prefix = format!("{line_num:>num_width$} | ");
-            result_lines.push(format!("{prefix}{line_content}"));
-
-            if idx == error_idx {
-                let caret_prefix = format!("{:num_width$} | ", "");
-                let caret_pos = column.saturating_sub(1);
-                let caret_line = format!("{caret_prefix}{:caret_pos$}^", "");
-                result_lines.push(caret_line);
-            }
-        }
-
-        result_lines.join("\n")
+    #[test]
+    fn test_parser_error_display() {
+        let token = Token::new(TokenType::Eof, "", 3, 15);
+        let error = ParserError::new("Unexpected EOF", token);
+        let display = format!("{}", error);
+        assert!(display.contains("Parser error"));
+        assert!(display.contains("3:15"));
+        assert!(display.contains("Unexpected EOF"));
     }
 }

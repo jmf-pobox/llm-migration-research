@@ -1,108 +1,264 @@
-//! AST node definitions for rpn2tex parser.
+//! Abstract Syntax Tree node definitions.
 //!
-//! This module defines the Abstract Syntax Tree (AST) nodes used to represent
-//! parsed RPN expressions.
+//! This module defines the AST nodes used to represent parsed expressions.
 
-/// Expression node types.
+/// An expression node in the AST.
 ///
-/// Represents the structure of mathematical expressions.
+/// Supports numeric literals and binary operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub enum Expr {
-    /// Numeric literal
+    /// A numeric literal.
     Number(Number),
-    /// Binary operation (e.g., addition, subtraction)
+    /// A binary operation (addition, etc.).
     BinaryOp(BinaryOp),
 }
 
-/// Numeric literal node.
+/// A numeric literal node.
 ///
-/// Represents integer and decimal numbers in expressions.
+/// Stores the numeric value as a string to preserve original formatting.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::ast::Number;
+/// use rpn2tex::Number;
 ///
-/// let num = Number::new("42".to_string(), 1, 1);
-/// assert_eq!(num.value, "42");
+/// let num = Number::new("3.14", 1, 1);
+/// assert_eq!(num.value(), "3.14");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub struct Number {
-    /// The string representation of the number
-    pub value: String,
-    /// Line number (1-based) where node appears
-    pub line: usize,
-    /// Column number (1-based) where node starts
-    pub column: usize,
+    value: String,
+    line: usize,
+    column: usize,
 }
 
 impl Number {
-    /// Create a new Number node.
+    /// Creates a new number node.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The string representation of the number
+    /// * `line` - The line number (1-based)
+    /// * `column` - The column number (1-based)
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Number;
+    /// use rpn2tex::Number;
     ///
-    /// let num = Number::new("3.14".to_string(), 1, 1);
+    /// let num = Number::new("42", 1, 5);
+    /// assert_eq!(num.value(), "42");
+    /// assert_eq!(num.line(), 1);
+    /// assert_eq!(num.column(), 5);
     /// ```
-    #[must_use]
-    pub fn new(value: String, line: usize, column: usize) -> Self {
+    pub fn new(value: impl Into<String>, line: usize, column: usize) -> Self {
         Self {
-            value,
+            value: value.into(),
             line,
             column,
         }
     }
+
+    /// Returns the string value of the number.
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    /// Returns the line number (1-based).
+    #[must_use]
+    pub const fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Returns the column number (1-based).
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
+    }
 }
 
-/// Binary operation node.
+/// A binary operation node.
 ///
-/// Represents operations with two operands (e.g., addition, subtraction).
+/// Represents binary operations like addition, subtraction, multiplication, and division.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::ast::{BinaryOp, Expr, Number};
+/// use rpn2tex::{BinaryOp, Number, Expr};
 ///
-/// let left = Expr::Number(Number::new("5".to_string(), 1, 1));
-/// let right = Expr::Number(Number::new("3".to_string(), 1, 3));
-/// let add = BinaryOp::new("+".to_string(), left, right, 1, 5);
+/// let left = Number::new("5", 1, 1);
+/// let right = Number::new("3", 1, 3);
+/// let binop = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+/// assert_eq!(binop.operator(), "+");
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub struct BinaryOp {
-    /// The operator string (e.g., "+", "-", "*", "/")
-    pub operator: String,
-    /// Left operand
-    pub left: Box<Expr>,
-    /// Right operand
-    pub right: Box<Expr>,
-    /// Line number (1-based) where node appears
-    pub line: usize,
-    /// Column number (1-based) where node starts
-    pub column: usize,
+    operator: String,
+    left: Box<Expr>,
+    right: Box<Expr>,
+    line: usize,
+    column: usize,
 }
 
 impl BinaryOp {
-    /// Create a new BinaryOp node.
+    /// Creates a new binary operation node.
+    ///
+    /// # Arguments
+    ///
+    /// * `operator` - The operator string ("+", "-", "*", "/")
+    /// * `left` - The left operand expression
+    /// * `right` - The right operand expression
+    /// * `line` - The line number (1-based)
+    /// * `column` - The column number (1-based)
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::{BinaryOp, Expr, Number};
+    /// use rpn2tex::{BinaryOp, Number, Expr};
     ///
-    /// let left = Expr::Number(Number::new("5".to_string(), 1, 1));
-    /// let right = Expr::Number(Number::new("3".to_string(), 1, 3));
-    /// let add = BinaryOp::new("+".to_string(), left, right, 1, 5);
+    /// let left = Number::new("2", 1, 1);
+    /// let right = Number::new("3", 1, 3);
+    /// let add = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+    /// assert_eq!(add.operator(), "+");
     /// ```
-    #[must_use]
-    pub fn new(operator: String, left: Expr, right: Expr, line: usize, column: usize) -> Self {
+    pub fn new(
+        operator: impl Into<String>,
+        left: Expr,
+        right: Expr,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
-            operator,
+            operator: operator.into(),
             left: Box::new(left),
             right: Box::new(right),
             line,
             column,
         }
+    }
+
+    /// Returns the operator string.
+    #[must_use]
+    pub fn operator(&self) -> &str {
+        &self.operator
+    }
+
+    /// Returns a reference to the left operand.
+    pub fn left(&self) -> &Expr {
+        &self.left
+    }
+
+    /// Returns a reference to the right operand.
+    pub fn right(&self) -> &Expr {
+        &self.right
+    }
+
+    /// Returns the line number (1-based).
+    #[must_use]
+    pub const fn line(&self) -> usize {
+        self.line
+    }
+
+    /// Returns the column number (1-based).
+    #[must_use]
+    pub const fn column(&self) -> usize {
+        self.column
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_number_creation() {
+        let num = Number::new("42", 1, 1);
+        assert_eq!(num.value(), "42");
+        assert_eq!(num.line(), 1);
+        assert_eq!(num.column(), 1);
+    }
+
+    #[test]
+    fn test_number_with_decimal() {
+        let num = Number::new("3.14", 2, 5);
+        assert_eq!(num.value(), "3.14");
+        assert_eq!(num.line(), 2);
+        assert_eq!(num.column(), 5);
+    }
+
+    #[test]
+    fn test_number_negative() {
+        let num = Number::new("-5", 1, 1);
+        assert_eq!(num.value(), "-5");
+    }
+
+    #[test]
+    fn test_expr_number() {
+        let num = Number::new("100", 1, 1);
+        let expr = Expr::Number(num.clone());
+        match expr {
+            Expr::Number(n) => assert_eq!(n.value(), "100"),
+            _ => panic!("Expected Number"),
+        }
+    }
+
+    #[test]
+    fn test_number_clone() {
+        let num1 = Number::new("42", 1, 1);
+        let num2 = num1.clone();
+        assert_eq!(num1, num2);
+    }
+
+    #[test]
+    fn test_binop_creation() {
+        let left = Number::new("5", 1, 1);
+        let right = Number::new("3", 1, 3);
+        let binop = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+        assert_eq!(binop.operator(), "+");
+        assert_eq!(binop.line(), 1);
+        assert_eq!(binop.column(), 5);
+    }
+
+    #[test]
+    fn test_binop_operands() {
+        let left = Number::new("2", 1, 1);
+        let right = Number::new("3", 1, 3);
+        let binop = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+
+        match binop.left() {
+            Expr::Number(n) => assert_eq!(n.value(), "2"),
+            _ => panic!("Expected Number"),
+        }
+
+        match binop.right() {
+            Expr::Number(n) => assert_eq!(n.value(), "3"),
+            _ => panic!("Expected Number"),
+        }
+    }
+
+    #[test]
+    fn test_expr_binop() {
+        let left = Number::new("1", 1, 1);
+        let right = Number::new("2", 1, 3);
+        let binop = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+        let expr = Expr::BinaryOp(binop.clone());
+
+        match expr {
+            Expr::BinaryOp(b) => assert_eq!(b.operator(), "+"),
+            _ => panic!("Expected BinaryOp"),
+        }
+    }
+
+    #[test]
+    fn test_binop_clone() {
+        let left = Number::new("5", 1, 1);
+        let right = Number::new("3", 1, 3);
+        let binop1 = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 5);
+        let binop2 = binop1.clone();
+        assert_eq!(binop1, binop2);
     }
 }

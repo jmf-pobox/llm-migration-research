@@ -1,472 +1,225 @@
 package com.rpn2tex;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Feature tests for operator precedence and parenthesization.
+ * Tests for the precedence and parenthesization feature.
  *
- * <p>Tests the complete pipeline: Lexer -> Parser -> LaTeXGenerator
- * for expressions involving multiple operators with different precedence levels.
+ * <p>Tests the complete pipeline for complex expressions with mixed operators,
+ * ensuring correct parenthesization based on operator precedence levels.
  *
- * <p>Key aspects tested:
+ * <p>Precedence levels:
  * <ul>
- *   <li>Precedence levels: * and / bind tighter than + and -</li>
- *   <li>Parenthesization: lower precedence under higher precedence gets parens</li>
- *   <li>Associativity: left-associative operators (-, /) need parens on right side</li>
- *   <li>No extra parens: operations of equal or higher precedence don't need parens</li>
+ *   <li>Addition (+) and Subtraction (-): precedence 1 (lowest)</li>
+ *   <li>Multiplication (*) and Division (/): precedence 2 (highest)</li>
+ * </ul>
+ *
+ * <p>Parenthesization rules:
+ * <ul>
+ *   <li>Lower precedence operations need parentheses when children of higher precedence</li>
+ *   <li>Right operands of subtraction/division need parentheses if they're also subtraction/division (left-associativity)</li>
  * </ul>
  */
 class PrecedenceFeatureTest {
 
     /**
-     * Test Case 1: Addition on left side of multiplication.
+     * Tests all I/O contract cases for the precedence feature.
      *
-     * <p>Input: "5 3 + 2 *"
-     * <p>Expected: "$( 5 + 3 ) \\times 2$"
-     * <p>Rationale: Addition has lower precedence than multiplication,
-     * so it needs parentheses when it appears as an operand to multiplication.
+     * <p>These test cases verify that the system correctly handles:
+     * <ul>
+     *   <li>Addition as left child of multiplication</li>
+     *   <li>Addition as right child of multiplication</li>
+     *   <li>Both operands having lower precedence operations</li>
+     *   <li>Complex mixed expressions with division, addition, and multiplication</li>
+     * </ul>
      */
-    @Test
-    void testAdditionLeftOfMultiplication() throws Exception {
-        String input = "5 3 + 2 *";
-        String expected = "$( 5 + 3 ) \\times 2$";
-
-        // Lex
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+        5 3 + 2 *          | $( 5 + 3 ) \\times 2$
+        2 3 + 4 *          | $( 2 + 3 ) \\times 4$
+        2 3 4 + *          | $2 \\times ( 3 + 4 )$
+        1 2 + 3 4 + *      | $( 1 + 2 ) \\times ( 3 + 4 )$
+        10 2 / 3 + 4 *     | $( 10 \\div 2 + 3 ) \\times 4$
+        """)
+    void testPrecedenceIOContract(String input, String expected) throws RpnException {
         Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-
-        // Generate
+        Expr ast = parser.parse();
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals(expected, result, "Mismatch for input: " + input);
     }
 
-    /**
-     * Test Case 2: Addition on left side of multiplication (different numbers).
-     *
-     * <p>Input: "2 3 + 4 *"
-     * <p>Expected: "$( 2 + 3 ) \\times 4$"
-     * <p>Rationale: Same as test case 1, verifying consistent behavior.
-     */
     @Test
-    void testAdditionLeftOfMultiplicationVariant() throws Exception {
-        String input = "2 3 + 4 *";
-        String expected = "$( 2 + 3 ) \\times 4$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testAdditionAsLeftChildOfMultiplication() throws RpnException {
+        // 5 3 + 2 * should be (5 + 3) * 2, with parentheses needed
+        Lexer lexer = new Lexer("5 3 + 2 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
+        // Verify AST structure
+        assertTrue(ast instanceof BinaryOp);
+        BinaryOp mult = (BinaryOp) ast;
+        assertEquals("*", mult.operator());
+        assertTrue(mult.left() instanceof BinaryOp);
+        BinaryOp add = (BinaryOp) mult.left();
+        assertEquals("+", add.operator());
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$( 5 + 3 ) \\times 2$", result);
     }
 
-    /**
-     * Test Case 3: Addition on right side of multiplication.
-     *
-     * <p>Input: "2 3 4 + *"
-     * <p>Expected: "$2 \\times ( 3 + 4 )$"
-     * <p>Rationale: Addition has lower precedence than multiplication,
-     * needs parentheses regardless of position.
-     */
     @Test
-    void testAdditionRightOfMultiplication() throws Exception {
-        String input = "2 3 4 + *";
-        String expected = "$2 \\times ( 3 + 4 )$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testAdditionAsRightChildOfMultiplication() throws RpnException {
+        // 2 3 4 + * should be 2 * (3 + 4), with parentheses needed on right
+        Lexer lexer = new Lexer("2 3 4 + *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
+        // Verify AST structure
+        assertTrue(ast instanceof BinaryOp);
+        BinaryOp mult = (BinaryOp) ast;
+        assertEquals("*", mult.operator());
+        assertTrue(mult.right() instanceof BinaryOp);
+        BinaryOp add = (BinaryOp) mult.right();
+        assertEquals("+", add.operator());
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$2 \\times ( 3 + 4 )$", result);
     }
 
-    /**
-     * Test Case 4: Addition on both sides of multiplication.
-     *
-     * <p>Input: "1 2 + 3 4 + *"
-     * <p>Expected: "$( 1 + 2 ) \\times ( 3 + 4 )$"
-     * <p>Rationale: Both addition operations have lower precedence,
-     * so both need parentheses.
-     */
     @Test
-    void testAdditionBothSidesOfMultiplication() throws Exception {
-        String input = "1 2 + 3 4 + *";
-        String expected = "$( 1 + 2 ) \\times ( 3 + 4 )$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testBothOperandsHaveLowerPrecedence() throws RpnException {
+        // 1 2 + 3 4 + * should be (1 + 2) * (3 + 4), both need parentheses
+        Lexer lexer = new Lexer("1 2 + 3 4 + *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
+        // Verify AST structure
+        assertTrue(ast instanceof BinaryOp);
+        BinaryOp mult = (BinaryOp) ast;
+        assertEquals("*", mult.operator());
+        assertTrue(mult.left() instanceof BinaryOp);
+        assertTrue(mult.right() instanceof BinaryOp);
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$( 1 + 2 ) \\times ( 3 + 4 )$", result);
     }
 
-    /**
-     * Test Case 5: Mixed division and addition with multiplication.
-     *
-     * <p>Input: "10 2 / 3 + 4 *"
-     * <p>Expected: "$( 10 \\div 2 + 3 ) \\times 4$"
-     * <p>Rationale: Division and addition combine to form a lower-precedence
-     * expression (because + has precedence 1), which needs parentheses
-     * when multiplied.
-     */
     @Test
-    void testMixedDivisionAdditionMultiplication() throws Exception {
-        String input = "10 2 / 3 + 4 *";
-        String expected = "$( 10 \\div 2 + 3 ) \\times 4$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testComplexMixedExpression() throws RpnException {
+        // 10 2 / 3 + 4 * should be (10 / 2 + 3) * 4
+        // This tests division (precedence 2) then addition (precedence 1) under multiplication (precedence 2)
+        Lexer lexer = new Lexer("10 2 / 3 + 4 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
+        // Verify AST structure
+        assertTrue(ast instanceof BinaryOp);
+        BinaryOp mult = (BinaryOp) ast;
+        assertEquals("*", mult.operator());
+        assertTrue(mult.left() instanceof BinaryOp);
+        BinaryOp add = (BinaryOp) mult.left();
+        assertEquals("+", add.operator());
+        assertTrue(add.left() instanceof BinaryOp);
+        BinaryOp div = (BinaryOp) add.left();
+        assertEquals("/", div.operator());
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$( 10 \\div 2 + 3 ) \\times 4$", result);
     }
 
-    /**
-     * Test subtraction on left side of multiplication.
-     *
-     * <p>Input: "5 3 - 2 *"
-     * <p>Expected: "$( 5 - 3 ) \\times 2$"
-     * <p>Rationale: Subtraction has lower precedence than multiplication.
-     */
     @Test
-    void testSubtractionLeftOfMultiplication() throws Exception {
-        String input = "5 3 - 2 *";
-        String expected = "$( 5 - 3 ) \\times 2$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testSubtractionAsLeftChildOfMultiplication() throws RpnException {
+        // 10 5 - 2 * should be (10 - 5) * 2
+        Lexer lexer = new Lexer("10 5 - 2 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$( 10 - 5 ) \\times 2$", result);
     }
 
-    /**
-     * Test subtraction on right side of multiplication.
-     *
-     * <p>Input: "2 5 3 - *"
-     * <p>Expected: "$2 \\times ( 5 - 3 )$"
-     * <p>Rationale: Subtraction has lower precedence than multiplication.
-     */
     @Test
-    void testSubtractionRightOfMultiplication() throws Exception {
-        String input = "2 5 3 - *";
-        String expected = "$2 \\times ( 5 - 3 )$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testSubtractionAsRightChildOfMultiplication() throws RpnException {
+        // 2 10 5 - * should be 2 * (10 - 5)
+        Lexer lexer = new Lexer("2 10 5 - *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$2 \\times ( 10 - 5 )$", result);
     }
 
-    /**
-     * Test addition on left side of division.
-     *
-     * <p>Input: "5 3 + 2 /"
-     * <p>Expected: "$( 5 + 3 ) \\div 2$"
-     * <p>Rationale: Addition has lower precedence than division.
-     */
     @Test
-    void testAdditionLeftOfDivision() throws Exception {
-        String input = "5 3 + 2 /";
-        String expected = "$( 5 + 3 ) \\div 2$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testDivisionAsLeftChildOfMultiplication() throws RpnException {
+        // 10 2 / 3 * should be (10 / 2) * 3
+        // NOTE: Division and multiplication have SAME precedence, so no parens needed
+        Lexer lexer = new Lexer("10 2 / 3 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$10 \\div 2 \\times 3$", result);
     }
 
-    /**
-     * Test addition on right side of division.
-     *
-     * <p>Input: "10 2 3 + /"
-     * <p>Expected: "$10 \\div ( 2 + 3 )$"
-     * <p>Rationale: Addition has lower precedence than division.
-     */
     @Test
-    void testAdditionRightOfDivision() throws Exception {
-        String input = "10 2 3 + /";
-        String expected = "$10 \\div ( 2 + 3 )$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testMultiplicationNoParensForSamePrecedence() throws RpnException {
+        // 2 3 * 4 * should be 2 * 3 * 4, no parentheses (same precedence, left-associative)
+        Lexer lexer = new Lexer("2 3 * 4 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$2 \\times 3 \\times 4$", result);
     }
 
-    /**
-     * Test that multiplication doesn't need parens under addition.
-     *
-     * <p>Input: "2 3 4 * +"
-     * <p>Expected: "$2 + 3 \\times 4$"
-     * <p>Rationale: Multiplication has higher precedence, no parens needed.
-     */
     @Test
-    void testMultiplicationUnderAdditionNoParens() throws Exception {
-        String input = "2 3 4 * +";
-        String expected = "$2 + 3 \\times 4$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testAdditionNoParensForSamePrecedence() throws RpnException {
+        // 1 2 + 3 + 4 + should be 1 + 2 + 3 + 4, no parentheses
+        Lexer lexer = new Lexer("1 2 + 3 + 4 +");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$1 + 2 + 3 + 4$", result);
     }
 
-    /**
-     * Test that division doesn't need parens under addition.
-     *
-     * <p>Input: "10 4 2 / +"
-     * <p>Expected: "$10 + 4 \\div 2$"
-     * <p>Rationale: Division has higher precedence, no parens needed.
-     */
     @Test
-    void testDivisionUnderAdditionNoParens() throws Exception {
-        String input = "10 4 2 / +";
-        String expected = "$10 + 4 \\div 2$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
+    void testMultiplicationBindsTighterThanAddition() throws RpnException {
+        // 2 3 4 * + should be 2 + 3 * 4, multiplication binds tighter so NO parens
+        Lexer lexer = new Lexer("2 3 4 * +");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
+
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test that multiplication doesn't need parens under subtraction.
-     *
-     * <p>Input: "10 2 3 * -"
-     * <p>Expected: "$10 - 2 \\times 3$"
-     * <p>Rationale: Multiplication has higher precedence, no parens needed.
-     */
-    @Test
-    void testMultiplicationUnderSubtractionNoParens() throws Exception {
-        String input = "10 2 3 * -";
-        String expected = "$10 - 2 \\times 3$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test multiplication on both sides of addition.
-     *
-     * <p>Input: "2 3 * 4 5 * +"
-     * <p>Expected: "$2 \\times 3 + 4 \\times 5$"
-     * <p>Rationale: Both multiplications have higher precedence, no parens needed.
-     */
-    @Test
-    void testMultiplicationBothSidesOfAddition() throws Exception {
-        String input = "2 3 * 4 5 * +";
-        String expected = "$2 \\times 3 + 4 \\times 5$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test that multiplication and division have same precedence.
-     *
-     * <p>Input: "12 3 / 2 *"
-     * <p>Expected: "$12 \\div 3 \\times 2$"
-     * <p>Rationale: Equal precedence, left-associative, no parens on left.
-     */
-    @Test
-    void testDivisionLeftOfMultiplication() throws Exception {
-        String input = "12 3 / 2 *";
-        String expected = "$12 \\div 3 \\times 2$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test that division on right of multiplication needs parens.
-     *
-     * <p>Input: "12 3 2 / *"
-     * <p>Expected: "$12 \\times ( 3 \\div 2 )$"
-     * <p>Rationale: Equal precedence, but division is non-commutative
-     * and on the right side, so needs parens for left-associativity.
-     */
-    @Test
-    void testDivisionRightOfMultiplication() throws Exception {
-        String input = "12 3 2 / *";
-        String expected = "$12 \\times ( 3 \\div 2 )$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test that addition and subtraction have same precedence.
-     *
-     * <p>Input: "10 3 - 2 +"
-     * <p>Expected: "$10 - 3 + 2$"
-     * <p>Rationale: Equal precedence, left-associative, no parens on left.
-     */
-    @Test
-    void testSubtractionLeftOfAddition() throws Exception {
-        String input = "10 3 - 2 +";
-        String expected = "$10 - 3 + 2$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test that subtraction on right of addition needs parens.
-     *
-     * <p>Input: "10 3 2 - +"
-     * <p>Expected: "$10 + ( 3 - 2 )$"
-     * <p>Rationale: Equal precedence, but subtraction is non-commutative
-     * and on the right side, so needs parens for left-associativity.
-     */
-    @Test
-    void testSubtractionRightOfAddition() throws Exception {
-        String input = "10 3 2 - +";
-        String expected = "$10 + ( 3 - 2 )$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test complex nested expression with multiple precedence levels.
-     *
-     * <p>Input: "2 3 + 4 5 + * 6 +"
-     * <p>Expected: "$( 2 + 3 ) \\times ( 4 + 5 ) + 6$"
-     * <p>Rationale: The multiplication of two additions needs parens around
-     * each addition. The result is then added to 6, which doesn't need parens.
-     */
-    @Test
-    void testComplexNestedExpression() throws Exception {
-        String input = "2 3 + 4 5 + * 6 +";
-        String expected = "$( 2 + 3 ) \\times ( 4 + 5 ) + 6$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
-    }
-
-    /**
-     * Test deeply nested expression.
-     *
-     * <p>Input: "2 3 4 5 + * + 6 *"
-     * <p>Expected: "$( 2 + 3 \\times ( 4 + 5 ) ) \\times 6$"
-     * <p>Rationale: Tests multiple levels of nesting with precedence.
-     */
-    @Test
-    void testDeeplyNestedExpression() throws Exception {
-        String input = "2 3 4 5 + * + 6 *";
-        String expected = "$( 2 + 3 \\times ( 4 + 5 ) ) \\times 6$";
-
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$2 + 3 \\times 4$", result);
     }
 }

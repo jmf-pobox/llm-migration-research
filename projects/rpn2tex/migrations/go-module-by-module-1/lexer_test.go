@@ -1,115 +1,170 @@
-package rpn2tex
+package main
 
 import (
 	"testing"
 )
 
-func TestLexer_BasicOperators(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []Token
-	}{
-		{
-			name:  "addition",
-			input: "+",
-			want: []Token{
-				{Type: PLUS, Value: "+", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 2},
-			},
-		},
-		{
-			name:  "subtraction",
-			input: "-",
-			want: []Token{
-				{Type: MINUS, Value: "-", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 2},
-			},
-		},
-		{
-			name:  "multiplication",
-			input: "*",
-			want: []Token{
-				{Type: MULT, Value: "*", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 2},
-			},
-		},
-		{
-			name:  "division",
-			input: "/",
-			want: []Token{
-				{Type: DIV, Value: "/", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 2},
-			},
-		},
+// TestLexer_SimpleNumber tests lexing a single number.
+func TestLexer_SimpleNumber(t *testing.T) {
+	lexer := NewLexer("42")
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
-			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
-			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
-			}
-		})
+	expected := []Token{
+		{Type: NUMBER, Value: "42", Line: 1, Column: 1},
+		{Type: EOF, Value: "", Line: 1, Column: 3},
+	}
+
+	if len(tokens) != len(expected) {
+		t.Fatalf("Expected %d tokens, got %d", len(expected), len(tokens))
+	}
+
+	for i, exp := range expected {
+		if tokens[i] != exp {
+			t.Errorf("Token %d: expected %v, got %v", i, exp, tokens[i])
+		}
 	}
 }
 
-func TestLexer_Numbers(t *testing.T) {
+// TestLexer_FloatingPoint tests lexing decimal numbers.
+func TestLexer_FloatingPoint(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []Token
+		input    string
+		expected []Token
 	}{
 		{
-			name:  "single digit",
-			input: "5",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 2},
-			},
-		},
-		{
-			name:  "multi-digit integer",
-			input: "123",
-			want: []Token{
-				{Type: NUMBER, Value: "123", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 4},
-			},
-		},
-		{
-			name:  "decimal number",
 			input: "3.14",
-			want: []Token{
+			expected: []Token{
 				{Type: NUMBER, Value: "3.14", Line: 1, Column: 1},
 				{Type: EOF, Value: "", Line: 1, Column: 5},
 			},
 		},
 		{
-			name:  "decimal with single digit",
-			input: "1.5",
-			want: []Token{
+			input: "1.5 0.5",
+			expected: []Token{
 				{Type: NUMBER, Value: "1.5", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 4},
+				{Type: NUMBER, Value: "0.5", Line: 1, Column: 5},
+				{Type: EOF, Value: "", Line: 1, Column: 8},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			lexer := NewLexer(tt.input)
+			tokens, err := lexer.Tokenize()
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(tokens) != len(tt.expected) {
+				t.Fatalf("Expected %d tokens, got %d", len(tt.expected), len(tokens))
+			}
+
+			for i, exp := range tt.expected {
+				if tokens[i] != exp {
+					t.Errorf("Token %d: expected %v, got %v", i, exp, tokens[i])
+				}
+			}
+		})
+	}
+}
+
+// TestLexer_NegativeNumber tests lexing negative numbers.
+func TestLexer_NegativeNumber(t *testing.T) {
+	lexer := NewLexer("-5")
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expected := []Token{
+		{Type: NUMBER, Value: "-5", Line: 1, Column: 1},
+		{Type: EOF, Value: "", Line: 1, Column: 3},
+	}
+
+	if len(tokens) != len(expected) {
+		t.Fatalf("Expected %d tokens, got %d", len(expected), len(tokens))
+	}
+
+	for i, exp := range expected {
+		if tokens[i] != exp {
+			t.Errorf("Token %d: expected %v, got %v", i, exp, tokens[i])
+		}
+	}
+}
+
+// TestLexer_Operators tests lexing all operators.
+func TestLexer_Operators(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected TokenType
+		value    string
+	}{
+		{"+", PLUS, "+"},
+		{"-", MINUS, "-"},
+		{"*", MULT, "*"},
+		{"/", DIV, "/"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			lexer := NewLexer(tt.input)
+			tokens, err := lexer.Tokenize()
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if len(tokens) != 2 { // operator + EOF
+				t.Fatalf("Expected 2 tokens, got %d", len(tokens))
+			}
+
+			if tokens[0].Type != tt.expected {
+				t.Errorf("Expected type %v, got %v", tt.expected, tokens[0].Type)
+			}
+
+			if tokens[0].Value != tt.value {
+				t.Errorf("Expected value %q, got %q", tt.value, tokens[0].Value)
+			}
+		})
+	}
+}
+
+// TestLexer_MinusDisambiguation tests minus as operator vs negative number.
+func TestLexer_MinusDisambiguation(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []Token
+	}{
+		{
+			name:  "Minus operator with space",
+			input: "5 - 3",
+			expected: []Token{
+				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
+				{Type: MINUS, Value: "-", Line: 1, Column: 3},
+				{Type: NUMBER, Value: "3", Line: 1, Column: 5},
+				{Type: EOF, Value: "", Line: 1, Column: 6},
 			},
 		},
 		{
-			name:  "negative number",
-			input: "-5",
-			want: []Token{
-				{Type: NUMBER, Value: "-5", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 3},
+			name:  "Negative number",
+			input: "5 -3",
+			expected: []Token{
+				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
+				{Type: NUMBER, Value: "-3", Line: 1, Column: 3},
+				{Type: EOF, Value: "", Line: 1, Column: 5},
 			},
 		},
 		{
-			name:  "negative decimal",
-			input: "-3.14",
-			want: []Token{
-				{Type: NUMBER, Value: "-3.14", Line: 1, Column: 1},
+			name:  "Minus followed by non-digit",
+			input: "5 - +",
+			expected: []Token{
+				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
+				{Type: MINUS, Value: "-", Line: 1, Column: 3},
+				{Type: PLUS, Value: "+", Line: 1, Column: 5},
 				{Type: EOF, Value: "", Line: 1, Column: 6},
 			},
 		},
@@ -118,28 +173,35 @@ func TestLexer_Numbers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
+			tokens, err := lexer.Tokenize()
 			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
+				t.Fatalf("Unexpected error: %v", err)
 			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
+
+			if len(tokens) != len(tt.expected) {
+				t.Fatalf("Expected %d tokens, got %d", len(tt.expected), len(tokens))
+			}
+
+			for i, exp := range tt.expected {
+				if tokens[i] != exp {
+					t.Errorf("Token %d: expected %v, got %v", i, exp, tokens[i])
+				}
 			}
 		})
 	}
 }
 
-func TestLexer_SimpleExpressions(t *testing.T) {
+// TestLexer_ComplexExpression tests lexing a complete RPN expression.
+func TestLexer_ComplexExpression(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []Token
+		name     string
+		input    string
+		expected []Token
 	}{
 		{
-			name:  "simple addition",
+			name:  "Simple addition",
 			input: "5 3 +",
-			want: []Token{
+			expected: []Token{
 				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
 				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
 				{Type: PLUS, Value: "+", Line: 1, Column: 5},
@@ -147,62 +209,9 @@ func TestLexer_SimpleExpressions(t *testing.T) {
 			},
 		},
 		{
-			name:  "simple subtraction",
-			input: "5 3 -",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: MINUS, Value: "-", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 6},
-			},
-		},
-		{
-			name:  "simple multiplication",
-			input: "4 7 *",
-			want: []Token{
-				{Type: NUMBER, Value: "4", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "7", Line: 1, Column: 3},
-				{Type: MULT, Value: "*", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 6},
-			},
-		},
-		{
-			name:  "simple division",
-			input: "10 2 /",
-			want: []Token{
-				{Type: NUMBER, Value: "10", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "2", Line: 1, Column: 4},
-				{Type: DIV, Value: "/", Line: 1, Column: 6},
-				{Type: EOF, Value: "", Line: 1, Column: 7},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
-			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
-			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLexer_ComplexExpressions(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []Token
-	}{
-		{
-			name:  "precedence test 1",
+			name:  "Mixed operators",
 			input: "5 3 + 2 *",
-			want: []Token{
+			expected: []Token{
 				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
 				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
 				{Type: PLUS, Value: "+", Line: 1, Column: 5},
@@ -212,102 +221,13 @@ func TestLexer_ComplexExpressions(t *testing.T) {
 			},
 		},
 		{
-			name:  "precedence test 2",
-			input: "2 3 4 * +",
-			want: []Token{
-				{Type: NUMBER, Value: "2", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: NUMBER, Value: "4", Line: 1, Column: 5},
-				{Type: MULT, Value: "*", Line: 1, Column: 7},
-				{Type: PLUS, Value: "+", Line: 1, Column: 9},
-				{Type: EOF, Value: "", Line: 1, Column: 10},
-			},
-		},
-		{
-			name:  "decimal numbers",
-			input: "3.14 2 *",
-			want: []Token{
-				{Type: NUMBER, Value: "3.14", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "2", Line: 1, Column: 6},
-				{Type: MULT, Value: "*", Line: 1, Column: 8},
-				{Type: EOF, Value: "", Line: 1, Column: 9},
-			},
-		},
-		{
-			name:  "chain of operations",
-			input: "100 10 / 5 / 2 /",
-			want: []Token{
-				{Type: NUMBER, Value: "100", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "10", Line: 1, Column: 5},
-				{Type: DIV, Value: "/", Line: 1, Column: 8},
-				{Type: NUMBER, Value: "5", Line: 1, Column: 10},
-				{Type: DIV, Value: "/", Line: 1, Column: 12},
-				{Type: NUMBER, Value: "2", Line: 1, Column: 14},
-				{Type: DIV, Value: "/", Line: 1, Column: 16},
-				{Type: EOF, Value: "", Line: 1, Column: 17},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
-			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
-			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLexer_WhitespaceHandling(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []Token
-	}{
-		{
-			name:  "multiple spaces",
-			input: "5   3   +",
-			want: []Token{
+			name:  "Multiple whitespace",
+			input: "5   3    +",
+			expected: []Token{
 				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
 				{Type: NUMBER, Value: "3", Line: 1, Column: 5},
-				{Type: PLUS, Value: "+", Line: 1, Column: 9},
-				{Type: EOF, Value: "", Line: 1, Column: 10},
-			},
-		},
-		{
-			name:  "tabs",
-			input: "5\t3\t+",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: PLUS, Value: "+", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 6},
-			},
-		},
-		{
-			name:  "leading whitespace",
-			input: "  5 3 +",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 3},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 5},
-				{Type: PLUS, Value: "+", Line: 1, Column: 7},
-				{Type: EOF, Value: "", Line: 1, Column: 8},
-			},
-		},
-		{
-			name:  "trailing whitespace",
-			input: "5 3 +  ",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: PLUS, Value: "+", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 8},
+				{Type: PLUS, Value: "+", Line: 1, Column: 10},
+				{Type: EOF, Value: "", Line: 1, Column: 11},
 			},
 		},
 	}
@@ -315,111 +235,53 @@ func TestLexer_WhitespaceHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
+			tokens, err := lexer.Tokenize()
 			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
+				t.Fatalf("Unexpected error: %v", err)
 			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
+
+			if len(tokens) != len(tt.expected) {
+				t.Fatalf("Expected %d tokens, got %d", len(tt.expected), len(tokens))
+			}
+
+			for i, exp := range tt.expected {
+				if tokens[i] != exp {
+					t.Errorf("Token %d: expected %v, got %v", i, exp, tokens[i])
+				}
 			}
 		})
 	}
 }
 
-func TestLexer_PositionTracking(t *testing.T) {
+// TestLexer_InvalidCharacter tests error handling for invalid characters.
+func TestLexer_InvalidCharacter(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []Token
+		name           string
+		input          string
+		expectedChar   rune
+		expectedLine   int
+		expectedColumn int
 	}{
 		{
-			name:  "multiline input",
-			input: "5 3 +\n2 *",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: PLUS, Value: "+", Line: 1, Column: 5},
-				{Type: NUMBER, Value: "2", Line: 2, Column: 1},
-				{Type: MULT, Value: "*", Line: 2, Column: 3},
-				{Type: EOF, Value: "", Line: 2, Column: 4},
-			},
+			name:           "Caret operator",
+			input:          "2 3 ^",
+			expectedChar:   '^',
+			expectedLine:   1,
+			expectedColumn: 5,
 		},
 		{
-			name:  "carriage return",
-			input: "5 3\r\n+",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: PLUS, Value: "+", Line: 2, Column: 1},
-				{Type: EOF, Value: "", Line: 2, Column: 2},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
-			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
-			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestLexer_ErrorCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		wantErr     bool
-		wantErrLine int
-		wantErrCol  int
-		wantErrMsg  string
-	}{
-		{
-			name:        "exponentiation operator",
-			input:       "2 3 ^",
-			wantErr:     true,
-			wantErrLine: 1,
-			wantErrCol:  5,
-			wantErrMsg:  "Unexpected character '^'",
+			name:           "Invalid character at start",
+			input:          "^ 2 3",
+			expectedChar:   '^',
+			expectedLine:   1,
+			expectedColumn: 1,
 		},
 		{
-			name:        "exponentiation in middle",
-			input:       "2 3 ^ 4 *",
-			wantErr:     true,
-			wantErrLine: 1,
-			wantErrCol:  5,
-			wantErrMsg:  "Unexpected character '^'",
-		},
-		{
-			name:        "multiple exponentiation",
-			input:       "2 3 4 ^ ^",
-			wantErr:     true,
-			wantErrLine: 1,
-			wantErrCol:  7,
-			wantErrMsg:  "Unexpected character '^'",
-		},
-		{
-			name:        "invalid character",
-			input:       "5 3 @",
-			wantErr:     true,
-			wantErrLine: 1,
-			wantErrCol:  5,
-			wantErrMsg:  "Unexpected character '@'",
-		},
-		{
-			name:        "letter in input",
-			input:       "5 a +",
-			wantErr:     true,
-			wantErrLine: 1,
-			wantErrCol:  3,
-			wantErrMsg:  "Unexpected character 'a'",
+			name:           "Letter",
+			input:          "5 a 3",
+			expectedChar:   'a',
+			expectedLine:   1,
+			expectedColumn: 3,
 		},
 	}
 
@@ -427,155 +289,157 @@ func TestLexer_ErrorCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			lexer := NewLexer(tt.input)
 			_, err := lexer.Tokenize()
-
-			if !tt.wantErr {
-				if err != nil {
-					t.Errorf("Tokenize() unexpected error = %v", err)
-				}
-				return
-			}
-
 			if err == nil {
-				t.Errorf("Tokenize() expected error but got none")
-				return
+				t.Fatal("Expected error, got nil")
 			}
 
-			lexErr, ok := err.(*LexerError)
+			syntaxErr, ok := err.(*SyntaxError)
 			if !ok {
-				t.Errorf("Tokenize() error is not LexerError: %v", err)
-				return
+				t.Fatalf("Expected *SyntaxError, got %T", err)
 			}
 
-			if lexErr.Line != tt.wantErrLine {
-				t.Errorf("LexerError line = %d, want %d", lexErr.Line, tt.wantErrLine)
+			expectedMsg := "Unexpected character"
+			if len(syntaxErr.Message) < len(expectedMsg) || syntaxErr.Message[:len(expectedMsg)] != expectedMsg {
+				t.Errorf("Expected error message to start with %q, got %q", expectedMsg, syntaxErr.Message)
 			}
-			if lexErr.Column != tt.wantErrCol {
-				t.Errorf("LexerError column = %d, want %d", lexErr.Column, tt.wantErrCol)
+
+			if syntaxErr.Line != tt.expectedLine {
+				t.Errorf("Expected line %d, got %d", tt.expectedLine, syntaxErr.Line)
 			}
-			if lexErr.Message != tt.wantErrMsg {
-				t.Errorf("LexerError message = %q, want %q", lexErr.Message, tt.wantErrMsg)
+
+			if syntaxErr.Column != tt.expectedColumn {
+				t.Errorf("Expected column %d, got %d", tt.expectedColumn, syntaxErr.Column)
 			}
 		})
 	}
 }
 
-func TestLexer_NegativeNumberVsSubtraction(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []Token
-	}{
-		{
-			name:  "negative number",
-			input: "-5",
-			want: []Token{
-				{Type: NUMBER, Value: "-5", Line: 1, Column: 1},
-				{Type: EOF, Value: "", Line: 1, Column: 3},
-			},
-		},
-		{
-			name:  "subtraction operator",
-			input: "5 3 -",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: MINUS, Value: "-", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 6},
-			},
-		},
-		{
-			name:  "subtraction with spaces",
-			input: "- 5",
-			want: []Token{
-				{Type: MINUS, Value: "-", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "5", Line: 1, Column: 3},
-				{Type: EOF, Value: "", Line: 1, Column: 4},
-			},
-		},
-		{
-			name:  "negative after operator",
-			input: "5 -3 +",
-			want: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "-3", Line: 1, Column: 3},
-				{Type: PLUS, Value: "+", Line: 1, Column: 6},
-				{Type: EOF, Value: "", Line: 1, Column: 7},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
-			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
-			}
-			if !tokensEqual(got, tt.want) {
-				t.Errorf("Tokenize() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
+// TestLexer_EmptyInput tests lexing empty input.
 func TestLexer_EmptyInput(t *testing.T) {
 	lexer := NewLexer("")
-	got, err := lexer.Tokenize()
+	tokens, err := lexer.Tokenize()
 	if err != nil {
-		t.Errorf("Tokenize() error = %v", err)
-		return
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	want := []Token{
-		{Type: EOF, Value: "", Line: 1, Column: 1},
+	if len(tokens) != 1 {
+		t.Fatalf("Expected 1 token (EOF), got %d", len(tokens))
 	}
 
-	if !tokensEqual(got, want) {
-		t.Errorf("Tokenize() = %v, want %v", got, want)
+	if tokens[0].Type != EOF {
+		t.Errorf("Expected EOF token, got %v", tokens[0].Type)
 	}
 }
 
+// TestLexer_WhitespaceOnly tests lexing whitespace-only input.
 func TestLexer_WhitespaceOnly(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{"spaces", "   "},
-		{"tabs", "\t\t\t"},
-		{"newlines", "\n\n"},
-		{"mixed", " \t\n\r "},
+	inputs := []string{
+		" ",
+		"   ",
+		"\t",
+		"\n",
+		" \t\n ",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lexer := NewLexer(tt.input)
-			got, err := lexer.Tokenize()
+	for _, input := range inputs {
+		t.Run("whitespace", func(t *testing.T) {
+			lexer := NewLexer(input)
+			tokens, err := lexer.Tokenize()
 			if err != nil {
-				t.Errorf("Tokenize() error = %v", err)
-				return
+				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			// Should only contain EOF token
-			if len(got) != 1 || got[0].Type != EOF {
-				t.Errorf("Tokenize() = %v, want single EOF token", got)
+			if len(tokens) != 1 {
+				t.Fatalf("Expected 1 token (EOF), got %d", len(tokens))
+			}
+
+			if tokens[0].Type != EOF {
+				t.Errorf("Expected EOF token, got %v", tokens[0].Type)
 			}
 		})
 	}
 }
 
-// Helper function to compare token slices
-func tokensEqual(a, b []Token) bool {
-	if len(a) != len(b) {
-		return false
+// TestLexer_IOContract tests specific I/O contract cases.
+func TestLexer_IOContract(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		valid bool // true if should succeed, false if should error
+	}{
+		{"Addition", "5 3 +", true},
+		{"Subtraction", "5 3 -", true},
+		{"Multiplication", "4 7 *", true},
+		{"Division", "10 2 /", true},
+		{"Floating point", "3.14 2 *", true},
+		{"Complex expression", "5 3 + 2 *", true},
+		{"Invalid caret", "2 3 ^", false},
+		{"Caret in expression", "2 3 ^ 4 *", false},
+		{"Multiple carets", "2 3 4 ^ ^", false},
 	}
-	for i := range a {
-		if a[i].Type != b[i].Type ||
-			a[i].Value != b[i].Value ||
-			a[i].Line != b[i].Line ||
-			a[i].Column != b[i].Column {
-			return false
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lexer := NewLexer(tt.input)
+			tokens, err := lexer.Tokenize()
+
+			if tt.valid {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
+				if len(tokens) == 0 {
+					t.Fatal("Expected tokens, got empty slice")
+				}
+				// Last token should be EOF
+				if tokens[len(tokens)-1].Type != EOF {
+					t.Errorf("Expected last token to be EOF, got %v", tokens[len(tokens)-1].Type)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("Expected error, got nil")
+				}
+				syntaxErr, ok := err.(*SyntaxError)
+				if !ok {
+					t.Fatalf("Expected *SyntaxError, got %T", err)
+				}
+				expectedMsg := "Unexpected character '^'"
+				if syntaxErr.Message != expectedMsg {
+					t.Errorf("Expected error message %q, got %q", expectedMsg, syntaxErr.Message)
+				}
+			}
+		})
+	}
+}
+
+// TestLexer_PositionTracking tests that line and column numbers are correct.
+func TestLexer_PositionTracking(t *testing.T) {
+	input := "5 3 +"
+	lexer := NewLexer(input)
+	tokens, err := lexer.Tokenize()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectedPositions := []struct {
+		line   int
+		column int
+	}{
+		{1, 1}, // 5
+		{1, 3}, // 3
+		{1, 5}, // +
+		{1, 6}, // EOF
+	}
+
+	if len(tokens) != len(expectedPositions) {
+		t.Fatalf("Expected %d tokens, got %d", len(expectedPositions), len(tokens))
+	}
+
+	for i, pos := range expectedPositions {
+		if tokens[i].Line != pos.line {
+			t.Errorf("Token %d: expected line %d, got %d", i, pos.line, tokens[i].Line)
+		}
+		if tokens[i].Column != pos.column {
+			t.Errorf("Token %d: expected column %d, got %d", i, pos.column, tokens[i].Column)
 		}
 	}
-	return true
 }

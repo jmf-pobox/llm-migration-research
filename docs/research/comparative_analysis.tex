@@ -32,7 +32,7 @@
 \maketitle
 
 \begin{abstract}
-This paper demonstrates that LLM-based multi-agent systems can reliably perform automated cross-language code migration for small-scale, well-structured codebases. We present empirical validation using a 990-line Python codebase migrated to three structurally different target languages: Rust (a systems language with ownership semantics), Java (a managed language with garbage collection), and Go (a systems language with composition-based design). All migrations achieved 100\% behavioral equivalence with the source implementation, as verified through input-output contract validation. The Rust migration produced 579 lines at \$6.53 USD; the Java migration produced 368 lines at \$4.92 USD; the Go migration produced 781 lines at \$6.85 USD. We evaluated two migration strategies: \textit{module-by-module} (vertical slices) and \textit{feature-by-feature} (horizontal slices), finding both produce identical behavioral output with different code organization. Our four-phase methodology---I/O contract generation, source analysis, sequential migration, and behavioral review---proved language-agnostic, requiring only configuration changes to target different languages. These results establish that automated migration is achievable for codebases exhibiting low cyclomatic complexity, strong module boundaries, and comprehensive test coverage. The methodology's limitations at this scale---primarily the trivial nature of the subject system---motivate future research into scaling these techniques to medium-complexity codebases with cross-module dependencies and external integrations.
+This paper evaluates LLM-based multi-agent systems for autonomous cross-language code migration using a 352-line Python codebase migrated to Rust, Java, and Go. Unlike AI-assisted approaches requiring human guidance, our migrations run end-to-end without human intervention: agents read source code, generate target implementations, execute quality gates, and iterate on failures autonomously. We performed six migrations---two strategies (module-by-module and feature-by-feature) across three target languages---with automated metrics collection including cost, duration, lines of code, and test coverage. All migrations completed successfully and passed quality gates. Observed costs ranged from \$6.43 to \$14.11 USD per migration; test coverage ranged from 64.9\% to 94.8\% depending on target language and strategy. A notable finding: while the source Python had a 0.6x test-to-production ratio, agents generated 2--4x more test code than production code in target languages (e.g., Go MbM: 3,207 test LOC for 856 production LOC)---a 3--6x increase in relative test investment. Rust migrations achieved the highest coverage (94--95\%), followed by Java (73--84\%) and Go (65--68\%). Module-by-module completed faster (32--37 minutes) than feature-by-feature (55--60 minutes), but cost differences showed no consistent pattern. The four-phase methodology---I/O contract generation, source analysis, sequential migration, and behavioral review---proved language-agnostic. These results establish that automated migration is achievable for small-scale, well-structured codebases, while highlighting the need for multiple runs to characterize performance distributions.
 \end{abstract}
 
 \section{Introduction}
@@ -45,7 +45,9 @@ This paper presents evidence that LLM-based multi-agent systems can reliably aut
 
 \subsection{Problem Statement}
 
-Traditional LLM-based code generation tools suffer from fundamental limitations when applied to migration tasks. First, most tools lack file system access, requiring developers to manually copy source code into prompts. This approach does not scale to multi-file codebases and prevents agents from exploring dependencies. Second, without build tool integration, generated code cannot be verified for correctness until manual compilation. Third, single-shot generation provides no mechanism for iterative refinement based on compilation errors or test failures.
+Existing LLM-based migration approaches typically operate in an AI-assisted mode: developers prompt models for code suggestions, manually review and integrate outputs, and handle compilation errors themselves. This human-in-the-loop approach limits throughput and requires developer attention throughout the process.
+
+Traditional LLM-based code generation tools suffer from fundamental limitations when applied to fully autonomous migration. First, most tools lack file system access, requiring developers to manually copy source code into prompts. This approach does not scale to multi-file codebases and prevents agents from exploring dependencies. Second, without build tool integration, generated code cannot be verified for correctness until manual compilation. Third, single-shot generation provides no mechanism for iterative refinement based on compilation errors or test failures.
 
 Perhaps most critically, existing approaches conflate API compatibility with behavioral equivalence. A migration that preserves function signatures may still produce different outputs for identical inputs, particularly in edge cases involving operator precedence, associativity, or error handling.
 
@@ -64,17 +66,17 @@ This study addresses three primary research questions:
 This paper makes four contributions:
 
 \begin{enumerate}
-\item \textbf{Proof of concept}: We demonstrate that automated migration achieving 100\% behavioral equivalence is achievable for small-scale, well-structured codebases.
+\item \textbf{Autonomous migration}: We demonstrate end-to-end migration without human intervention, where agents autonomously handle error recovery through feedback loops with compilers, linters, and test runners.
 \item \textbf{Multi-language validation}: We show the same four-phase methodology succeeds for Rust, Java, and Go, establishing language-agnostic generality.
 \item \textbf{Methodology specification}: We define a repeatable four-phase process (I/O contract, analysis, migration, review) with explicit quality gates.
-\item \textbf{Scope characterization}: We identify the characteristics that made our subject system amenable to automated migration, informing future scaling research.
+\item \textbf{Scope characterization}: We identify the characteristics that made our subject system amenable to autonomous migration, informing future scaling research.
 \end{enumerate}
 
 \section{Background}
 
 \subsection{Subject System}
 
-Our experiments used \texttt{rpn2tex}, a command-line tool that converts Reverse Polish Notation mathematical expressions to LaTeX format. The Python implementation comprises 990 lines of code across seven modules: token definitions, abstract syntax tree nodes, error handling, lexical analysis, parsing, LaTeX generation, and command-line interface.
+Our experiments used \texttt{rpn2tex}, a command-line tool that converts Reverse Polish Notation mathematical expressions to LaTeX format. The Python implementation comprises 352 lines of production code across seven modules: token definitions, abstract syntax tree nodes, error handling, lexical analysis, parsing, LaTeX generation, and command-line interface.
 
 We deliberately selected a \textit{trivial} subject system to establish baseline feasibility before investigating more complex scenarios. The system exhibits characteristics that represent ideal conditions for automated migration:
 
@@ -89,31 +91,28 @@ We deliberately selected a \textit{trivial} subject system to establish baseline
 
 \subsubsection{Code Metrics}
 
-Table~\ref{tab:complexity} presents production code metrics across all implementations, measured using line counts excluding test code.
+The source Python implementation contains 352 lines of production code and 204 lines of test code across 7 modules. Table~\ref{tab:loc} presents lines of code for all migrations, distinguishing production code from test code.
 
 \begin{table}[h]
 \centering
-\caption{Production code metrics (excluding tests)}
-\label{tab:complexity}
-\begin{tabular}{@{}llrr@{}}
+\caption{Lines of code by target and strategy}
+\label{tab:loc}
+\begin{tabular}{@{}llrrr@{}}
 \toprule
-Target & Strategy & LOC & Funcs \\
+Target & Strategy & Prod & Test & Ratio \\
 \midrule
-Python & (source) & 352 & 25 \\
-\midrule
-Rust & Mod-by-mod & 579 & 38 \\
-Rust & Feat-by-feat & 549 & 33 \\
-\midrule
-Java & Mod-by-mod & 368 & 31 \\
-Java & Feat-by-feat & 389 & 32 \\
-\midrule
-Go & Mod-by-mod & 781 & 42 \\
-Go & Feat-by-feat & 613 & 35 \\
+Python & (source) & 352 & 204 & 0.6x \\
+Rust & MbM & 601 & 1,070 & 1.8x \\
+Rust & FbF & 513 & 1,354 & 2.6x \\
+Java & MbM & 553 & 1,805 & 3.3x \\
+Java & FbF & 516 & 1,022 & 2.0x \\
+Go & MbM & 856 & 3,207 & 3.7x \\
+Go & FbF & 479 & 1,380 & 2.9x \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Both migration strategies produced similar amounts of production code for each target language. Rust migrations expanded from 352 to approximately 560 LOC (1.6x), Java migrations expanded to approximately 380 LOC (1.1x), and Go migrations expanded to approximately 700 LOC (2.0x). Go's higher expansion ratio reflects explicit error handling with \texttt{if err != nil} patterns, verbose struct definitions, and the module-by-module strategy's tendency to generate more comprehensive test infrastructure.
+A notable finding: while the source Python had a 0.6x test-to-production ratio (204 test LOC for 352 prod LOC), agents generated 2--4x more test code than production code in the target languages. The test-to-production ratio ranged from 1.8x (Rust MbM) to 3.7x (Go MbM)---a 3--6x increase in relative test coverage compared to the source. This suggests the quality gates and I/O contract requirements drive substantial test generation as agents work to satisfy behavioral validation criteria.
 
 These characteristics represent a best-case scenario for automated migration. The research question is not whether this particular system can be migrated---it clearly can---but whether the methodology that succeeds here generalizes to other target languages and, eventually, to more complex systems.
 
@@ -127,9 +126,16 @@ This separation allows cost optimization by using expensive models only for code
 
 \subsection{Quality Gates}
 
-Each module migration required passing four quality gates before proceeding. The Rust compiler must accept the code without errors. The Clippy linter must report zero warnings when run in strict mode. The code formatter must not require any changes. All unit tests and documentation tests must pass.
+Each module migration required passing four quality gates before proceeding:
 
-These gates ensure that generated code meets production quality standards and that issues are caught and corrected during migration rather than discovered later.
+\begin{enumerate}
+\item \textbf{Compilation}: The target language compiler must accept the code without errors (rustc, javac, or go build).
+\item \textbf{Linting}: The language-specific linter must report zero warnings in strict mode (Clippy for Rust, Checkstyle for Java, go vet for Go).
+\item \textbf{Formatting}: The code formatter must not require any changes (rustfmt, google-java-format, gofmt).
+\item \textbf{Testing}: All unit tests must pass.
+\end{enumerate}
+
+These gates ensure that generated code meets production quality standards and that issues are caught and corrected during migration rather than discovered later. The autonomous feedback loop between code generation and quality gates allows agents to iterate on failures without human intervention.
 
 \section{Method}
 
@@ -167,23 +173,23 @@ We performed migrations to three structurally different target languages: Rust (
 \centering
 \caption{Migration results by target and strategy}
 \label{tab:multilang}
-\begin{tabular}{@{}llrrr@{}}
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
-Target & Strategy & Dur. & Cost & Msgs \\
+Target & Strategy & Dur. & Cost & Msgs & Cov. \\
 \midrule
-Rust & Mod-by-mod & 32m & \$6.53 & 937 \\
-Rust & Feat-by-feat & 32m & \$4.63 & 742 \\
-Java & Mod-by-mod & 26m & \$4.92 & 871 \\
-Java & Feat-by-feat & 51m & \$6.27 & 1026 \\
-Go & Mod-by-mod & 29m & \$6.85 & 918 \\
-Go & Feat-by-feat & 32m & \$5.60 & 581 \\
+Rust & MbM & 32m & \$8.83 & 906 & 94.7\% \\
+Rust & FbF & 60m & \$9.60 & 779 & 94.8\% \\
+Java & MbM & 37m & \$14.11 & 1370 & 84.0\% \\
+Java & FbF & 55m & \$8.18 & 779 & 73.0\% \\
+Go & MbM & 37m & \$8.99 & 1009 & 64.9\% \\
+Go & FbF & 56m & \$6.43 & 853 & 68.2\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All six migrations achieved 100\% I/O contract match. The observed cost and duration differences between strategies varied by target language: for Rust and Go, feature-by-feature was less expensive; for Java, module-by-module was less expensive.
+All six migrations completed successfully and passed quality gates. Module-by-module was consistently faster (32--37 minutes) than feature-by-feature (55--60 minutes). Cost varied without clear pattern: Java module-by-module was the most expensive run (\$14.11), while Go feature-by-feature was the least expensive (\$6.43). Test coverage varied substantially by target language: Rust achieved 94--95\%, Java 73--84\%, and Go 65--68\%.
 
-\textbf{Limitations of single-run observations}: Each configuration was executed once. The migration process involves non-deterministic model behavior, and observed differences may reflect run-to-run variance rather than systematic strategy effects. Establishing statistically significant conclusions about strategy efficiency would require 5--10 runs per configuration to characterize the distribution of outcomes.
+\textbf{Limitations of single-run observations}: Each configuration was executed once. The migration process involves non-deterministic model behavior, and observed differences may reflect run-to-run variance rather than systematic strategy effects. The Java module-by-module outlier (\$14.11, 1370 messages) may indicate error recovery cycles or could simply be an unlucky run.
 
 \section{Discussion}
 
@@ -217,29 +223,23 @@ Table~\ref{tab:strategy} presents observed metrics for both strategies across ta
 \label{tab:strategy}
 \begin{tabular}{@{}llrrr@{}}
 \toprule
-Target & Strategy & Cost & API & Msgs \\
+Target & Strategy & Cost & Dur. & Msgs \\
 \midrule
-Rust & Mod-by-mod & \$6.53 & 55m & 937 \\
-Rust & Feat-by-feat & \$4.63 & 33m & 742 \\
-Java & Mod-by-mod & \$4.92 & 45m & 871 \\
-Java & Feat-by-feat & \$6.27 & 54m & 1026 \\
-Go & Mod-by-mod & \$6.85 & 57m & 918 \\
-Go & Feat-by-feat & \$5.60 & 34m & 581 \\
+Rust & MbM & \$8.83 & 32m & 906 \\
+Rust & FbF & \$9.60 & 60m & 779 \\
+Java & MbM & \$14.11 & 37m & 1370 \\
+Java & FbF & \$8.18 & 55m & 779 \\
+Go & MbM & \$8.99 & 37m & 1009 \\
+Go & FbF & \$6.43 & 56m & 853 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Both strategies produced identical output for all test cases regardless of target language. The observed pattern---feature-by-feature appearing more efficient for Rust and Go while module-by-module appearing more efficient for Java---may reflect genuine differences in how each strategy interacts with target language characteristics, or may reflect run-to-run variance in non-deterministic model behavior.
+Both strategies produced correct output for all test cases. Module-by-module was consistently faster (32--37 minutes vs 55--60 minutes), but feature-by-feature produced fewer messages in most cases. Cost showed no consistent pattern by strategy.
 
-We note several possible explanations for the observed differences, though none are confirmed:
-\begin{itemize}
-\item Rust's module system and cargo's incremental compilation may favor feature-by-feature's iterative approach
-\item Go's flat package structure and fast compilation may similarly benefit from feature-by-feature's focused iterations
-\item Java's class-based structure may align better with module-by-module's complete-class-at-a-time approach
-\item The specific test cases and error recovery paths encountered in each run vary non-deterministically
-\end{itemize}
+The Java module-by-module run was the most expensive (\$14.11) with the most messages (1370), potentially indicating more error recovery cycles.
 
-Both strategies reliably produce correct output. For this trivial codebase, strategy selection does not affect correctness, only cost and duration.
+We cannot draw conclusions about strategy superiority from single runs. Both strategies reliably produce correct output. For this trivial codebase, strategy selection does not affect correctness.
 
 \subsection{Tool Usage Patterns}
 
@@ -253,17 +253,17 @@ Table~\ref{tab:tools} shows tool invocation counts across all migrations. These 
 \toprule
 Target & Strategy & Bash & Read & Write & Edit \\
 \midrule
-Rust & Mod-by-mod & 301 & 134 & 18 & 46 \\
-Rust & Feat-by-feat & 191 & 100 & 10 & 33 \\
-Java & Mod-by-mod & 268 & 99 & 21 & 5 \\
-Java & Feat-by-feat & 235 & 153 & 23 & 25 \\
-Go & Mod-by-mod & 255 & 114 & 34 & 9 \\
-Go & Feat-by-feat & 110 & 80 & 16 & 41 \\
+Rust & MbM & 237 & 123 & 30 & 14 \\
+Rust & FbF & 178 & 108 & 24 & 47 \\
+Java & MbM & 334 & 184 & 57 & 42 \\
+Java & FbF & 157 & 119 & 37 & 31 \\
+Go & MbM & 291 & 119 & 48 & 1 \\
+Go & FbF & 196 & 131 & 35 & 17 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Several patterns emerge from the tool usage data. Module-by-module consistently uses more Bash invocations (average 275 vs 179), reflecting more frequent build/test cycles per module. Feature-by-feature shows higher Edit-to-Write ratios in some cases, suggesting more iterative refinement of existing files rather than complete rewrites. The Go feature-by-feature migration stands out with notably fewer Bash calls (110), indicating more efficient iteration.
+Java module-by-module used the most Bash invocations (334) and Read operations (184), consistent with its higher message count and cost. Go module-by-module notably used only 1 Edit operation versus 48 Write operations, suggesting a strategy of writing complete files rather than iterative refinement. Feature-by-feature migrations generally showed higher Edit-to-Write ratios (e.g., Rust FbF: 47 Edit vs 24 Write), indicating more iterative file modification.
 
 \subsection{Test Coverage}
 
@@ -273,35 +273,43 @@ Table~\ref{tab:coverage} presents test coverage measurements for migrations wher
 \centering
 \caption{Test coverage by target and strategy}
 \label{tab:coverage}
-\begin{tabular}{@{}llrr@{}}
+\begin{tabular}{@{}llr@{}}
 \toprule
-Target & Strategy & Coverage & Tests \\
+Target & Strategy & Line Coverage \\
 \midrule
-Rust & Mod-by-mod & 96.9\% & 24 \\
-Rust & Feat-by-feat & 84.9\% & 19 \\
-Go & Mod-by-mod & 83.8\% & 230 \\
-Go & Feat-by-feat & 74.1\% & 125 \\
-Java & Mod-by-mod & --- & 0 \\
-Java & Feat-by-feat & 72.0\% & 50 \\
+Rust & MbM & 94.7\% \\
+Rust & FbF & 94.8\% \\
+Java & MbM & 84.0\% \\
+Java & FbF & 73.0\% \\
+Go & MbM & 64.9\% \\
+Go & FbF & 68.2\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Rust migrations achieved the highest coverage: 96.9\% for module-by-module and 84.9\% for feature-by-feature, measured using cargo-llvm-cov. Go migrations achieved 83.8\% (module-by-module) and 74.1\% (feature-by-feature) using Go's built-in coverage tooling. Java feature-by-feature achieved 72.0\% coverage with 50 JUnit tests measured via JaCoCo. Java module-by-module produced standalone demonstration programs rather than JUnit tests, so coverage measurement was not possible.
+Rust migrations achieved the highest coverage (94--95\%) regardless of strategy, measured using cargo-llvm-cov. Java coverage ranged from 73\% to 84\%, measured via JaCoCo. Go achieved the lowest coverage (65--68\%), measured using Go's built-in coverage tooling.
 
-These coverage gaps highlight a methodological limitation: the migration framework should ensure coverage tooling is configured during migration rather than requiring post-hoc measurement.
+The coverage disparity across languages warrants investigation. Rust's high coverage may reflect the language's emphasis on exhaustive pattern matching and the framework's Rust-specific idiom prompts requiring tests. Go's lower coverage may indicate that the framework's Go-specific prompts need refinement, or that Go's explicit error handling creates more code paths that tests do not exercise.
+
+\subsection{Code Idiomaticness}
+
+We evaluated each migration for adherence to target language idioms using an LLM-based reviewer. The reviewer examined source files against language-specific criteria: for Rust, proper use of Result/Option, ownership patterns, and pattern matching; for Java, encapsulation, naming conventions, and exception handling; for Go, error handling patterns, interface design, and struct organization. Scores were assigned on a three-tier scale: \textit{Idiomatic} (follows conventions well, would pass code review), \textit{Acceptable} (works but has non-idiomatic patterns), or \textit{Non-idiomatic} (significant style issues).
+
+All six migrations scored \textbf{Idiomatic}. The Rust migrations demonstrated proper error handling with the \texttt{?} operator, correct ownership with \texttt{Box} for recursive structures, and comprehensive pattern matching. Java migrations used sealed interfaces, immutable classes, and proper JavaDoc documentation. Go migrations followed the \texttt{if err != nil} pattern, used idiomatic \texttt{NewXxx} constructors, and maintained clean struct design.
+
+This uniformly high idiomaticness score suggests that the quality gates (Clippy for Rust, Checkstyle for Java, \texttt{go vet} for Go) effectively enforce language conventions during migration. The autonomous feedback loop between code generation and linting appears sufficient to produce code that would pass professional code review.
 
 \subsection{Cost Observations}
 
-Across all six migrations (three targets, two strategies each), observed costs ranged from \$4.63 to \$6.85, with durations from 26 to 51 minutes. For this 990-line source codebase, this corresponds to approximately \$4.70 to \$6.90 per thousand lines of source code.
+Across all six migrations, observed costs ranged from \$6.43 to \$14.11, with wall-clock durations from 32 to 60 minutes. For this 352-line source codebase, this corresponds to approximately \$18 to \$40 per thousand lines of source code.
 
-These observations derive from single runs per configuration. The non-deterministic nature of LLM-based migration means individual runs may vary. To establish reliable cost estimates, multiple runs per configuration would be necessary to characterize the distribution.
+The wide cost range (\$6.43 to \$14.11) from single runs highlights the variance in LLM-based migration. The Java module-by-module outlier (\$14.11) was more than double the least expensive run (\$6.43 for Go feature-by-feature). This variance makes per-KLOC cost projections unreliable without multiple runs per configuration.
 
-We note that all runs completed successfully with 100\% I/O contract match, suggesting the methodology is reliable for correctness even if cost varies between runs.
+All runs completed successfully, suggesting the methodology is reliable for correctness even if cost varies substantially between runs.
 
 \subsection{Scope Characterization and Limitations}
 
-The success of our methodology must be understood within its demonstrated scope. Our subject system represents a deliberately \textit{trivial} case: under 1,000 lines, no external dependencies, low cyclomatic complexity, unidirectional module dependencies, and deterministic input-output behavior. These characteristics define the boundary conditions under which we have validated the approach.
+The success of our methodology must be understood within its demonstrated scope. Our subject system represents a deliberately \textit{trivial} case: 352 lines of production code, no external dependencies, low cyclomatic complexity, unidirectional module dependencies, and deterministic input-output behavior. These characteristics define the boundary conditions under which we have validated the approach.
 
 \textbf{What we have proven}: LLM-based multi-agent migration can achieve 100\% behavioral equivalence for small-scale, well-structured codebases across multiple target languages.
 
@@ -326,37 +334,43 @@ Automated software migration has traditionally relied on rule-based transformati
 
 \section{Conclusion}
 
-This paper provides empirical evidence that LLM-based multi-agent systems can reliably automate cross-language code migration for small-scale, well-structured codebases. Through successful migrations to Rust, Java, and Go, we have validated a four-phase methodology that achieves 100\% behavioral equivalence with the source implementation.
+This paper provides empirical evidence that LLM-based multi-agent systems can automate cross-language code migration for small-scale, well-structured codebases. Through six migrations to Rust, Java, and Go using two strategies, we validated a four-phase methodology that successfully produces working code across structurally different target languages.
 
-\textbf{Primary finding}: The methodology is language-agnostic. The same four-phase process---I/O contract generation, source analysis, sequential migration, and behavioral review---succeeded for Rust (ownership semantics), Java (garbage collection), and Go (composition-based design). Only configuration changes were required: build commands, file extensions, and idiom-specific prompts. This validates that the approach is not target-specific.
+\textbf{Primary finding}: The methodology is language-agnostic. The same four-phase process---I/O contract generation, source analysis, sequential migration, and behavioral review---succeeded for all three target languages. Only configuration changes were required: build commands, file extensions, and idiom-specific prompts.
 
-\textbf{Secondary finding}: Behavioral contracts are essential. Without explicit I/O contract validation, migrations may produce functionally correct implementations that differ semantically from the source. Early experiments showed 19\% behavioral discrepancies despite passing all compilation, linting, and testing gates, demonstrating that traditional quality metrics are insufficient for faithful migration.
+\textbf{Coverage finding}: Test coverage varied substantially by target language: Rust achieved 94--95\%, Java 73--84\%, and Go 65--68\%. This disparity suggests that language-specific prompts influence test generation quality and warrants investigation.
 
-\textbf{Methodological finding}: Smaller, focused agent contexts outperform large comprehensive prompts. Multi-phase orchestration with focused specification documents achieved results four times faster and 25\% cheaper than embedding source code directly in prompts.
+\textbf{Cost finding}: Observed costs ranged from \$6.43 to \$14.11 per migration, a 2.2x variance from single runs. This variance makes cost prediction unreliable without multiple runs per configuration.
 
-Our subject system, \texttt{rpn2tex}, is deliberately trivial: under 1,000 lines, no external dependencies, low complexity, and deterministic behavior. This triviality is a feature, not a limitation. By demonstrating success on an ideal case, we establish that the fundamental approach works. The research question now shifts from feasibility to scalability.
+\textbf{Strategy finding}: Module-by-module completed faster (32--37 minutes) than feature-by-feature (55--60 minutes). Cost showed no consistent pattern by strategy. We cannot determine strategy superiority from single runs.
+
+Our subject system, \texttt{rpn2tex}, is deliberately trivial: 352 lines of production code, no external dependencies, low complexity, and deterministic behavior. This triviality establishes that the fundamental approach works. The research question now shifts from feasibility to scalability and variance characterization.
 
 \section{Future Work}
 
 The validated methodology provides a foundation for scaling research. Key questions for future investigation include:
 
-\textbf{Medium-complexity codebases}: How does the methodology perform on systems in the 5,000--20,000 LOC range with external dependencies? Our next target is \texttt{txt2tex}, a 9,300 LOC Python codebase with average cyclomatic complexity of 6.7 and maximum complexity of 40. At this scale, the relative performance of feature-by-feature versus module-by-module strategies remains an open question.
+\textbf{Variance characterization}: The 2.2x cost variance (\$6.43 to \$14.11) and coverage variance (65--95\%) observed from single runs necessitate multiple runs per configuration. We recommend 5--10 runs per configuration to establish confidence intervals for cost, duration, and coverage metrics.
 
-\textbf{Strategy selection}: When should feature-by-feature be preferred over module-by-module? Our observations showed different patterns by target language, but with only one run per configuration, we cannot determine whether these reflect systematic differences or run-to-run variance. Multiple runs per configuration would be needed to identify reliable strategy selection criteria.
+\textbf{Coverage improvement}: The 30-percentage-point coverage gap between Rust (94--95\%) and Go (65--68\%) suggests that language-specific prompts significantly influence test generation. Investigating prompt modifications to improve Go and Java coverage is a priority.
 
-\textbf{Dependency management}: Can agents automatically select equivalent libraries in the target ecosystem, or does this require human guidance? How should dependency version constraints be handled?
+\textbf{Medium-complexity codebases}: How does the methodology perform on systems in the 5,000--20,000 LOC range with external dependencies? At larger scale, variance characterization becomes more critical for practical deployment decisions.
 
-\textbf{Stateful systems}: How can behavioral contracts capture systems with internal state, side effects, or non-deterministic behavior? What contract languages are expressive enough for complex behavioral specifications?
+\textbf{Strategy selection}: Module-by-module was consistently faster, but neither strategy showed consistent cost advantage. Understanding when each strategy is preferable requires controlled experiments with multiple runs.
 
-\textbf{Incremental migration}: For large codebases, can migration proceed incrementally with interoperability between migrated and unmigrated modules? What FFI or serialization strategies enable gradual transition?
+\textbf{Dependency management}: Can agents automatically select equivalent libraries in the target ecosystem, or does this require human guidance?
 
-\textbf{Cost scaling}: Observed costs ranged from \$4.70 to \$6.60 per KLOC across four migrations of a single trivial system. How do costs scale with complexity? Are there complexity thresholds beyond which automated migration becomes cost-prohibitive? Characterizing the cost distribution would require additional runs.
+\textbf{Stateful systems}: How can behavioral contracts capture systems with internal state, side effects, or non-deterministic behavior?
 
-The success demonstrated in this paper represents a necessary but not sufficient condition for practical automated migration. We have proven that the approach works at small scale with two different strategies; the challenge now is determining how far it can scale.
+The success demonstrated in this paper establishes that the approach works at small scale. The challenge now is characterizing variance and determining scalability boundaries.
 
 \section*{Acknowledgments}
 
-This research was conducted using the Claude Agent SDK with Claude Opus 4.5 and Claude 3.5 Haiku models. The experimental framework and analysis were developed collaboratively between human and AI researchers.
+This research was conducted using the Claude Agent SDK with Claude 3.5 Sonnet and Claude 3.5 Haiku models. The experimental framework and analysis were developed collaboratively between human and AI researchers.
+
+\section*{Data Availability}
+
+The migration framework, experimental data, and all generated code are available at: \url{https://github.com/jmf-pobox/llm-migration-research}
 
 \bibliographystyle{plain}
 
@@ -374,176 +388,65 @@ The Rust Programming Language.
 
 \end{thebibliography}
 
+\onecolumn
 \appendix
 
-\section{Input-Output Contract}
+\section{Complete Migration Metrics}
 
-The behavioral contract comprised 21 test cases across eight categories: basic binary operations (4 tests), unsupported operators (3 tests), operator precedence (3 tests), associativity (2 tests), addition chains (1 test), mixed operations (4 tests), floating-point numbers (2 tests), and complex expressions (2 tests).
+Table~\ref{tab:complete} presents all collected metrics for the six migrations performed in this study.
 
-Representative examples include: input \texttt{5 3 +} producing output \texttt{\$5 + 3\$}; input \texttt{5 3 + 2 *} producing output \texttt{\$( 5 + 3 ) \textbackslash times 2\$}; and input \texttt{2 3 \^{}} producing an error for unsupported operator.
+\begin{table}[h]
+\centering
+\caption{Complete migration metrics for all configurations}
+\label{tab:complete}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& \multicolumn{3}{c}{Module-by-Module} & \multicolumn{3}{c}{Feature-by-Feature} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Metric & Rust & Java & Go & Rust & Java & Go \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Lines of Code}} \\
+Production LOC & 601 & 553 & 856 & 513 & 516 & 479 \\
+Test LOC & 1,070 & 1,805 & 3,207 & 1,354 & 1,022 & 1,380 \\
+Test/Prod ratio & 1.8x & 3.3x & 3.7x & 2.6x & 2.0x & 2.9x \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Timing}} \\
+Wall clock (min) & 32 & 37 & 37 & 60 & 55 & 56 \\
+API time (min) & 66 & 85 & 66 & 68 & 69 & 149 \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Cost \& Tokens}} \\
+Total cost (USD) & 8.83 & 14.11 & 8.99 & 9.60 & 8.18 & 6.43 \\
+Output tokens & 16,119 & 13,764 & 10,291 & 18,291 & 10,226 & 19,005 \\
+Cache read tokens & 149,507 & 198,183 & 151,472 & 280,854 & 193,786 & 551,784 \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Agent Activity}} \\
+Total messages & 906 & 1,370 & 1,009 & 779 & 779 & 853 \\
+Orchestrator turns & 17 & 28 & 17 & 21 & 19 & 32 \\
+Migrator invocations & 7 & 7 & 7 & 6 & 6 & 6 \\
+Reviewer invocations & 7 & 7 & 7 & 6 & 2 & 6 \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Tool Invocations}} \\
+Bash & 237 & 334 & 291 & 178 & 157 & 196 \\
+Read & 123 & 184 & 119 & 108 & 119 & 131 \\
+Write & 30 & 57 & 48 & 24 & 37 & 35 \\
+Edit & 14 & 42 & 1 & 47 & 31 & 17 \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Quality}} \\
+Line coverage (\%) & 94.7 & 84.0 & 64.9 & 94.8 & 73.0 & 68.2 \\
+Idiomaticness & Idiomatic & Idiomatic & Idiomatic & Idiomatic & Idiomatic & Idiomatic \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\onecolumn
-\section{Migration Framework Architecture}
-
-This appendix describes the multi-agent framework used to perform automated migrations. The framework is implemented using the Claude Agent SDK and consists of four specialized agents coordinated by an orchestrator.
-
-\subsection{Agent Roles}
-
-The framework employs four distinct agent types, each with specific responsibilities and tool access:
-
-\textbf{1. I/O Contract Agent} (Phase 0)
-\begin{itemize}[itemsep=0pt]
-\item \textit{Purpose}: Generate behavioral specification by executing source implementation
-\item \textit{Model}: Claude 3.5 Haiku (fast, low-cost)
-\item \textit{Tools}: \texttt{Bash}, \texttt{Read}
-\item \textit{Output}: Structured I/O contract mapping inputs to expected outputs
-\end{itemize}
-
-\textbf{2. Analyst Agent} (Phase 1)
-\begin{itemize}[itemsep=0pt]
-\item \textit{Purpose}: Read all source files and produce migration specification
-\item \textit{Model}: Claude 3.5 Haiku
-\item \textit{Tools}: \texttt{Read}, \texttt{Glob}, \texttt{Grep} (read-only access)
-\item \textit{Output}: Comprehensive specification document including I/O contract
-\end{itemize}
-
-\textbf{3. Migrator Agent} (Phase 2)
-\begin{itemize}[itemsep=0pt]
-\item \textit{Purpose}: Convert individual modules to target language
-\item \textit{Model}: Claude 3.5 Sonnet (more capable, higher cost)
-\item \textit{Tools}: \texttt{Read}, \texttt{Write}, \texttt{Edit}, \texttt{Bash}, \texttt{Glob}, \texttt{Grep} (full access)
-\item \textit{Output}: Target language source files passing quality gates
-\end{itemize}
-
-\textbf{4. Reviewer Agent} (Phase 3)
-\begin{itemize}[itemsep=0pt]
-\item \textit{Purpose}: Validate migrated code against specification and I/O contract
-\item \textit{Model}: Claude 3.5 Haiku
-\item \textit{Tools}: \texttt{Read}, \texttt{Glob}, \texttt{Grep}, \texttt{Bash}
-\item \textit{Output}: Review report with pass/fail verdict
-\end{itemize}
-
-\pagebreak
-
-\subsection{Orchestration Flow}
-
-The main orchestrator coordinates agent invocations following a strict phase order:
-
-\begin{lstlisting}[language={}]
-Orchestrator
-    |
-    +--[Phase 0]---> I/O Contract Agent
-    |                    |
-    |               (executes source on test inputs)
-    |                    |
-    |               I/O Contract Document
-    |                    |
-    +--[Phase 1]---> Analyst Agent
-    |                    |
-    |               (reads all source files)
-    |                    |
-    |               Migration Specification
-    |               (includes I/O contract)
-    |                    |
-    +--[Phase 2]---> Migrator Agent (module 1)
-    |                    |
-    |               <-- Quality Gate Loop -->
-    |                    |
-    +--[Phase 3]---> Reviewer Agent (module 1)
-    |                    |
-    +--[Phase 2]---> Migrator Agent (module 2)
-    |                    ...
-    |               (repeat for each module)
-    |                    |
-    +--[Complete]
-\end{lstlisting}
-
-\subsection{Feedback Loops}
-
-The framework implements two levels of feedback loops to ensure correctness:
-
-\textbf{Inner Loop: Quality Gates}
-
-During Phase 2, each migrator agent operates in a feedback loop with the build system:
-
-\begin{lstlisting}[language={}]
-Migrator writes code
-        |
-        v
-    [Build/Compile]---fail---> Migrator reads errors
-        |                           |
-       pass                    fixes code
-        |                           |
-        v                           v
-    [Lint/Format]---fail---> Migrator reads warnings
-        |                           |
-       pass                    fixes code
-        |                           |
-        v                           |
-    [Run Tests]---fail--------> Migrator reads failures
-        |                           |
-       pass                    fixes code
-        |                           |
-        v                           |
-    [I/O Contract]---fail----> Migrator adjusts logic
-        |
-       pass
-        |
-        v
-    Module Complete
-\end{lstlisting}
-
-For Rust migrations, quality gates are: \texttt{cargo check}, \texttt{cargo clippy -{}- -D warnings}, \texttt{cargo fmt}, and \texttt{cargo test}. For Java: \texttt{./gradlew compileJava}, \texttt{./gradlew checkstyleMain}, and \texttt{./gradlew test}. For Go: \texttt{go build}, \texttt{go vet}, \texttt{gofmt}, and \texttt{go test}.
-
-\textbf{Outer Loop: Review and Revision}
-
-After migration, the reviewer agent validates against the specification. If issues are found, the orchestrator can re-invoke the migrator with reviewer feedback:
-
-\begin{lstlisting}[language={}]
-Migrator completes module
-        |
-        v
-    Reviewer validates
-        |
-    +---pass---> Next module
-    |
-   fail
-    |
-    v
-Orchestrator passes feedback to Migrator
-        |
-        v
-    Migrator revises
-        |
-        v
-    (re-enter quality gate loop)
-\end{lstlisting}
-
-\subsection{Language-Agnostic Design}
-
-The framework abstracts language-specific details into a \texttt{LanguageTarget} interface:
-
-\begin{lstlisting}[language={}]
-class LanguageTarget(ABC):
-    name: str              # "rust", "java", "go"
-    file_extension: str    # ".rs", ".java", ".go"
-
-    def get_quality_gates() -> list[str]
-    def get_migrator_idioms() -> str
-    def get_reviewer_checks() -> str
-    def get_file_mapping(source_file) -> str
-\end{lstlisting}
-
-Adding a new target language requires implementing this interface with language-specific build commands, idiom requirements, and file naming conventions. The agent prompts, orchestration logic, and feedback loops remain unchanged.
-
-\subsection{Cost Optimization}
-
-The framework optimizes API costs through model selection:
+\vspace{1em}
+\noindent\textbf{Notes:}
 \begin{itemize}[nosep]
-\item Expensive models (Sonnet) only for code generation requiring creativity
-\item Cheaper models (Haiku) for analysis and validation tasks
-\item Specification documents reduce redundant source file reads
-\item Sequential module migration limits context size per invocation
+\item All migrations used Claude 3.5 Sonnet for code generation and Claude 3.5 Haiku for analysis/review
+\item Source codebase: 352 lines of Python production code + 204 lines of test code (0.6x test/prod ratio)
+\item Agents generated 2--4x more test code than production code, a 3--6x increase over source ratio
+\item Each configuration was run once; values represent single observations
+\item Cache read tokens indicate prompt caching efficiency (higher = more cache hits)
+\item Java FbF had only 2 reviewer invocations vs 6 for others, possibly due to early termination
 \end{itemize}
 
 \end{document}

@@ -1,179 +1,125 @@
 package com.rpn2tex;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Feature tests for multiplication operator.
+ * Tests for the multiplication feature.
  *
- * <p>Tests the complete pipeline: Lexer -> Parser -> LaTeXGenerator
- * for expressions involving multiplication.
- *
- * <p>Key aspects tested:
- * <ul>
- *   <li>Basic multiplication: "4 7 *" → "$4 \\times 7$"</li>
- *   <li>Precedence: multiplication binds tighter than addition</li>
- *   <li>Mixed operations: "2 3 4 * +" → "$2 + 3 \\times 4$"</li>
- *   <li>Parenthesization: "5 3 + 2 *" → "$( 5 + 3 ) \\times 2$"</li>
- * </ul>
+ * <p>Tests the complete pipeline for multiplication expressions:
+ * lexing, parsing, and LaTeX generation with proper precedence handling.
  */
 class MultiplicationFeatureTest {
 
-    /**
-     * Test basic multiplication of two numbers.
-     *
-     * <p>Input: "4 7 *"
-     * <p>Expected: "$4 \\times 7$"
-     */
-    @Test
-    void testBasicMultiplication() throws Exception {
-        String input = "4 7 *";
-        String expected = "$4 \\times 7$";
-
-        // Lex
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource(delimiter = '|', textBlock = """
+        4 7 *          | $4 \\times 7$
+        2 3 4 * +      | $2 + 3 \\times 4$
+        """)
+    void testMultiplicationIOContract(String input, String expected) throws RpnException {
         Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-
-        // Generate
+        Expr ast = parser.parse();
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals(expected, result, "Mismatch for input: " + input);
     }
 
-    /**
-     * Test multiplication with higher precedence than addition.
-     *
-     * <p>Input: "2 3 4 * +"
-     * <p>Expected: "$2 + 3 \\times 4$"
-     * <p>Multiplication should NOT have parentheses because it has higher precedence.
-     */
     @Test
-    void testMultiplicationPrecedence() throws Exception {
-        String input = "2 3 4 * +";
-        String expected = "$2 + 3 \\times 4$";
+    void testMultiplicationToken() throws RpnException {
+        Lexer lexer = new Lexer("4 7 *");
+        List<Token> tokens = lexer.tokenize();
 
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-
-        // Generate
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals(4, tokens.size()); // 4, 7, *, EOF
+        assertEquals(TokenType.NUMBER, tokens.get(0).type);
+        assertEquals("4", tokens.get(0).value);
+        assertEquals(TokenType.NUMBER, tokens.get(1).type);
+        assertEquals("7", tokens.get(1).value);
+        assertEquals(TokenType.STAR, tokens.get(2).type);
+        assertEquals("*", tokens.get(2).value);
+        assertEquals(TokenType.EOF, tokens.get(3).type);
     }
 
-    /**
-     * Test addition needs parentheses under multiplication.
-     *
-     * <p>Input: "5 3 + 2 *"
-     * <p>Expected: "$( 5 + 3 ) \\times 2$"
-     * <p>Addition has lower precedence, so it needs parentheses.
-     */
     @Test
-    void testAdditionNeedsParensUnderMultiplication() throws Exception {
-        String input = "5 3 + 2 *";
-        String expected = "$( 5 + 3 ) \\times 2$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testMultiplicationAST() throws RpnException {
+        Lexer lexer = new Lexer("4 7 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
-        LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertTrue(ast instanceof BinaryOp);
+        BinaryOp binOp = (BinaryOp) ast;
+        assertEquals("*", binOp.operator());
+        assertTrue(binOp.left() instanceof Number);
+        assertEquals("4", ((Number) binOp.left()).value());
+        assertTrue(binOp.right() instanceof Number);
+        assertEquals("7", ((Number) binOp.right()).value());
     }
 
-    /**
-     * Test complex expression with both multiplication and subtraction.
-     *
-     * <p>Input: "10 2 3 * -"
-     * <p>Expected: "$10 - 2 \\times 3$"
-     */
     @Test
-    void testMultiplicationWithSubtraction() throws Exception {
-        String input = "10 2 3 * -";
-        String expected = "$10 - 2 \\times 3$";
+    void testMultiplicationLaTeX() {
+        Number left = new Number("4", 1, 1);
+        Number right = new Number("7", 1, 3);
+        BinaryOp mult = new BinaryOp("*", left, right, 1, 5);
 
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
-        Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
-
-        // Generate
         LaTeXGenerator generator = new LaTeXGenerator();
-        String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        String result = generator.generate(mult);
+        assertEquals("$4 \\times 7$", result);
     }
 
-    /**
-     * Test multiplication of negative numbers.
-     *
-     * <p>Input: "-2 3 *"
-     * <p>Expected: "$-2 \\times 3$"
-     */
     @Test
-    void testMultiplicationWithNegativeNumber() throws Exception {
-        String input = "-2 3 *";
-        String expected = "$-2 \\times 3$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testMultiplicationPrecedence() throws RpnException {
+        // 2 3 4 * + should be 2 + (3 * 4), where multiplication binds tighter
+        // So output should be: 2 + 3 \times 4 (NO parentheses needed)
+        Lexer lexer = new Lexer("2 3 4 * +");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
-
-        assertEquals(expected, result);
+        assertEquals("$2 + 3 \\times 4$", result);
     }
 
-    /**
-     * Test chained multiplication.
-     *
-     * <p>Input: "2 3 * 4 *"
-     * <p>Expected: "$2 \\times 3 \\times 4$"
-     */
     @Test
-    void testChainedMultiplication() throws Exception {
-        String input = "2 3 * 4 *";
-        String expected = "$2 \\times 3 \\times 4$";
-
-        // Lex
-        Lexer lexer = new Lexer(input);
-        var tokens = lexer.tokenize();
-
-        // Parse
+    void testAdditionNeedsParensUnderMultiplication() throws RpnException {
+        // 5 3 + 2 * should be (5 + 3) * 2, with parentheses needed
+        Lexer lexer = new Lexer("5 3 + 2 *");
+        List<Token> tokens = lexer.tokenize();
         Parser parser = new Parser(tokens);
-        ASTNode ast = parser.parse();
+        Expr ast = parser.parse();
 
-        // Generate
         LaTeXGenerator generator = new LaTeXGenerator();
         String result = generator.generate(ast);
+        assertEquals("$( 5 + 3 ) \\times 2$", result);
+    }
 
-        assertEquals(expected, result);
+    @Test
+    void testMultiplicationWithSubtraction() throws RpnException {
+        // 10 5 - 2 * should be (10 - 5) * 2
+        Lexer lexer = new Lexer("10 5 - 2 *");
+        List<Token> tokens = lexer.tokenize();
+        Parser parser = new Parser(tokens);
+        Expr ast = parser.parse();
+
+        LaTeXGenerator generator = new LaTeXGenerator();
+        String result = generator.generate(ast);
+        assertEquals("$( 10 - 5 ) \\times 2$", result);
+    }
+
+    @Test
+    void testMultiplicationRequiresTwoOperands() throws RpnException {
+        Lexer lexer = new Lexer("5 *");
+        List<Token> tokens = lexer.tokenize();
+        Parser parser = new Parser(tokens);
+
+        RpnException exception = assertThrows(RpnException.class, parser::parse);
+        assertTrue(exception.getMessage().contains("requires two operands"));
     }
 }

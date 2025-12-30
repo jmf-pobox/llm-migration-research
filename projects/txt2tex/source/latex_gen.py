@@ -848,7 +848,7 @@ class LaTeXGenerator:
                 # Standard LaTeX: bare underscore
                 return f"{prefix}_{{{suffix}}}"
             # Priority 3: Long suffix → multi-word identifier (e.g., cumulative_total)
-            # len(suffix) >= 3  # noqa: ERA001
+            # len(suffix) >= 3
             return self._format_multiword_identifier(name)
 
         # Fallback: multi-word identifier
@@ -883,7 +883,7 @@ class LaTeXGenerator:
 
         # Add parentheses for function application with fuzz mode
         # Fuzz has different precedence: # binds less tightly than application
-        # So # s(i) means (# s)(i), but we want # (s(i))  # noqa: ERA001
+        # So # s(i) means (# s)(i), but we want # (s(i))
         if self.use_fuzz and isinstance(node.operand, FunctionApp):
             operand = f"({operand})"
 
@@ -1415,7 +1415,7 @@ class LaTeXGenerator:
                 # Critical for fuzz: P (P Z) → \power (\power Z) not \power \power Z
                 # FunctionApp: P (P Z), seq (seq X)
                 # BinaryOp: seq (X cross Y), P (A union B)
-                # GenericInstantiation: seq (P[X])  # noqa: ERA001
+                # GenericInstantiation: seq (P[X])
                 if isinstance(arg, (FunctionApp, BinaryOp, GenericInstantiation)):
                     arg_latex = f"({arg_latex})"
                 # Add ~ spacing hint between function and argument
@@ -1440,7 +1440,7 @@ class LaTeXGenerator:
                 and isinstance(node.function.args[0], Identifier)
                 and node.function.args[0].name in special_functions
             ):
-                # Pattern: (special_fn1(special_fn2))(args)  # noqa: ERA001
+                # Pattern: (special_fn1(special_fn2))(args)
                 # Generate: special_fn1~(special_fn2~args) with parens and tildes
                 outer_latex = special_functions[inner_func.name]
                 inner_latex = special_functions[node.function.args[0].name]

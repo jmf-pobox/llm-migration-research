@@ -1,91 +1,92 @@
-// Package rpn2tex provides utilities for converting Reverse Polish Notation (RPN)
-// expressions to LaTeX format.
-package rpn2tex
+package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
-// LexerError represents an error that occurs during lexical analysis.
-// It implements the error interface and includes position information
-// for detailed error reporting.
-type LexerError struct {
+// SyntaxError represents a parsing or lexing error with position information.
+type SyntaxError struct {
 	Message string
 	Line    int
 	Column  int
 }
 
-// Error returns the string representation of the LexerError.
-// It implements the error interface.
-func (e *LexerError) Error() string {
+// Error implements the error interface for SyntaxError.
+func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("Line %d, column %d: %s", e.Line, e.Column, e.Message)
 }
 
 // ErrorFormatter formats error messages with source code context.
 type ErrorFormatter struct {
-	source string
-	lines  []string
+	Source string
+	Lines  []string
 }
 
-// NewErrorFormatter creates a new ErrorFormatter for the given source text.
+// NewErrorFormatter creates a new ErrorFormatter from source text.
 func NewErrorFormatter(source string) *ErrorFormatter {
 	lines := strings.Split(source, "\n")
 	return &ErrorFormatter{
-		source: source,
-		lines:  lines,
+		Source: source,
+		Lines:  lines,
 	}
 }
 
-// FormatError formats an error message with source context showing the error location.
-// The contextLines parameter controls how many lines of context to show before and after
-// the error line (default behavior is 1).
-func (ef *ErrorFormatter) FormatError(message string, line int, column int, contextLines int) string {
-	var result strings.Builder
+// FormatError formats an error message with default context (1 line).
+func (ef *ErrorFormatter) FormatError(message string, line, column int) string {
+	return ef.FormatErrorWithContext(message, line, column, 1)
+}
 
-	// Write the error message header
-	result.WriteString(message)
-	result.WriteString("\n\n")
-
-	// Get the context
+// FormatErrorWithContext formats an error message with surrounding context lines.
+// The message includes the error description, source lines with line numbers,
+// and a caret (^) pointing to the error position.
+func (ef *ErrorFormatter) FormatErrorWithContext(message string, line, column, contextLines int) string {
 	context := ef.getContext(line, column, contextLines)
-	result.WriteString(context)
-
-	return result.String()
+	return fmt.Sprintf("%s\n%s", message, context)
 }
 
-// getContext generates the source context showing the error location.
-// It displays the line number, source line, and a caret pointing to the error column.
-func (ef *ErrorFormatter) getContext(line int, column int, contextLines int) string {
-	var result strings.Builder
+// getContext extracts source lines around the error position with line numbers and a caret.
+func (ef *ErrorFormatter) getContext(line, column, contextLines int) string {
+	errorIdx := line - 1
+	startIdx := max(0, errorIdx-contextLines)
+	endIdx := min(len(ef.Lines), errorIdx+contextLines+1)
+	maxLineNum := endIdx
+	numWidth := len(strconv.Itoa(maxLineNum))
 
-	// For now, we only show the single line with the error (contextLines is ignored)
-	// This matches the Python implementation's actual behavior in the I/O contract
+	var resultLines []string
+	for idx := startIdx; idx < endIdx; idx++ {
+		lineNum := idx + 1
+		lineContent := ""
+		if idx < len(ef.Lines) {
+			lineContent = ef.Lines[idx]
+		}
+		prefix := fmt.Sprintf("%*d | ", numWidth, lineNum)
+		resultLines = append(resultLines, prefix+lineContent)
 
-	// Calculate line number width for alignment
-	numWidth := len(fmt.Sprintf("%d", line))
-
-	// Get the source line (1-based indexing)
-	if line < 1 || line > len(ef.lines) {
-		return ""
+		if idx == errorIdx {
+			caretPrefix := strings.Repeat(" ", numWidth) + " | "
+			caretPos := max(0, column-1)
+			caretLine := caretPrefix + strings.Repeat(" ", caretPos) + "^"
+			resultLines = append(resultLines, caretLine)
+		}
 	}
-	sourceLine := ef.lines[line-1]
 
-	// Format the line with line number
-	linePrefix := fmt.Sprintf("%*d | ", numWidth, line)
-	result.WriteString(linePrefix)
-	result.WriteString(sourceLine)
-	result.WriteString("\n")
+	return strings.Join(resultLines, "\n")
+}
 
-	// Format the caret line
-	// The caret prefix has spaces instead of the line number
-	caretPrefix := strings.Repeat(" ", numWidth) + " | "
-	result.WriteString(caretPrefix)
+// max returns the maximum of two integers.
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
 
-	// Position the caret (column is 1-based, so we need column-1 spaces)
-	caretPos := column - 1
-	result.WriteString(strings.Repeat(" ", caretPos))
-	result.WriteString("^")
-
-	return result.String()
+// min returns the minimum of two integers.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

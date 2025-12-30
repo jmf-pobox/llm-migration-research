@@ -1,34 +1,31 @@
-// Package rpn2tex provides tools for converting Reverse Polish Notation (RPN)
-// expressions to LaTeX math mode output.
-package rpn2tex
+package main
 
 import (
 	"fmt"
 	"unicode"
 )
 
-// Lexer performs lexical analysis on RPN input text, converting it into tokens.
-// It tracks position information (line and column) for error reporting.
+// Lexer tokenizes RPN expression input.
+// It tracks position (line and column) for error reporting.
 type Lexer struct {
-	text   string
-	pos    int
-	line   int
-	column int
+	Text   string
+	Pos    int // Current position in Text (0-based)
+	Line   int // Current line number (1-based)
+	Column int // Current column number (1-based)
 }
 
 // NewLexer creates a new Lexer for the given input text.
-// Position tracking starts at line 1, column 1.
 func NewLexer(text string) *Lexer {
 	return &Lexer{
-		text:   text,
-		pos:    0,
-		line:   1,
-		column: 1,
+		Text:   text,
+		Pos:    0,
+		Line:   1,
+		Column: 1,
 	}
 }
 
-// Tokenize converts the input text into a slice of tokens.
-// It returns an error if any invalid characters are encountered.
+// Tokenize scans the entire input and returns a slice of tokens.
+// It returns an error if an invalid character is encountered.
 func (l *Lexer) Tokenize() ([]Token, error) {
 	var tokens []Token
 
@@ -42,7 +39,6 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		tokens = append(tokens, token)
 	}
 
@@ -50,16 +46,16 @@ func (l *Lexer) Tokenize() ([]Token, error) {
 	tokens = append(tokens, Token{
 		Type:   EOF,
 		Value:  "",
-		Line:   l.line,
-		Column: l.column,
+		Line:   l.Line,
+		Column: l.Column,
 	})
 
 	return tokens, nil
 }
 
-// atEnd returns true if the lexer has reached the end of the input.
+// atEnd returns true if we've reached the end of input.
 func (l *Lexer) atEnd() bool {
-	return l.pos >= len(l.text)
+	return l.Pos >= len(l.Text)
 }
 
 // peek returns the current character without consuming it.
@@ -68,45 +64,45 @@ func (l *Lexer) peek() rune {
 	if l.atEnd() {
 		return 0
 	}
-	return rune(l.text[l.pos])
+	return rune(l.Text[l.Pos])
 }
 
-// advance consumes and returns the current character, updating position tracking.
+// peekNext returns the next character without consuming it.
+// Returns 0 if at end or only one character remaining.
+func (l *Lexer) peekNext() rune {
+	if l.Pos+1 >= len(l.Text) {
+		return 0
+	}
+	return rune(l.Text[l.Pos+1])
+}
+
+// advance consumes and returns the current character, updating position.
 func (l *Lexer) advance() rune {
 	if l.atEnd() {
 		return 0
 	}
-
-	ch := rune(l.text[l.pos])
-	l.pos++
-
-	// Update line and column tracking
+	ch := rune(l.Text[l.Pos])
+	l.Pos++
 	if ch == '\n' {
-		l.line++
-		l.column = 1
+		l.Line++
+		l.Column = 1
 	} else {
-		l.column++
+		l.Column++
 	}
-
 	return ch
 }
 
-// skipWhitespace consumes all whitespace characters (space, tab, newline, carriage return).
+// skipWhitespace consumes all whitespace characters.
 func (l *Lexer) skipWhitespace() {
-	for !l.atEnd() {
-		ch := l.peek()
-		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-			l.advance()
-		} else {
-			break
-		}
+	for !l.atEnd() && unicode.IsSpace(l.peek()) {
+		l.advance()
 	}
 }
 
-// scanToken scans and returns the next token from the input.
+// scanToken scans and returns the next token.
 func (l *Lexer) scanToken() (Token, error) {
-	startLine := l.line
-	startColumn := l.column
+	startLine := l.Line
+	startColumn := l.Column
 	ch := l.advance()
 
 	switch ch {
@@ -117,18 +113,19 @@ func (l *Lexer) scanToken() (Token, error) {
 	case '/':
 		return Token{Type: DIV, Value: "/", Line: startLine, Column: startColumn}, nil
 	case '-':
-		// Check if this is a negative number or a subtraction operator
-		// If next character is a digit, it's a negative number
-		if !l.atEnd() && unicode.IsDigit(l.peek()) {
-			return l.scanNumber("-", startLine, startColumn)
+		// Check if this is a negative number or subtraction operator
+		// Negative number: '-' followed immediately by a digit
+		next := l.peek()
+		if unicode.IsDigit(next) {
+			return l.scanNumber("-", startLine, startColumn), nil
 		}
 		return Token{Type: MINUS, Value: "-", Line: startLine, Column: startColumn}, nil
 	default:
 		if unicode.IsDigit(ch) {
-			return l.scanNumber(string(ch), startLine, startColumn)
+			return l.scanNumber(string(ch), startLine, startColumn), nil
 		}
-		// Unexpected character - return LexerError
-		return Token{}, &LexerError{
+		// Invalid character
+		return Token{}, &SyntaxError{
 			Message: fmt.Sprintf("Unexpected character '%c'", ch),
 			Line:    startLine,
 			Column:  startColumn,
@@ -136,21 +133,21 @@ func (l *Lexer) scanToken() (Token, error) {
 	}
 }
 
-// scanNumber scans a numeric token (integer or decimal).
-// The prefix parameter contains any already-consumed characters (e.g., '-' for negative numbers).
-func (l *Lexer) scanNumber(prefix string, startLine int, startColumn int) (Token, error) {
+// scanNumber scans a numeric literal (integer or decimal).
+// prefix is the initial character(s) already consumed (e.g., "-" or a digit).
+func (l *Lexer) scanNumber(prefix string, startLine, startColumn int) Token {
 	value := prefix
 
-	// Consume remaining integer digits
+	// Scan integer part
 	for !l.atEnd() && unicode.IsDigit(l.peek()) {
 		value += string(l.advance())
 	}
 
 	// Check for decimal point
-	if !l.atEnd() && l.peek() == '.' {
+	if !l.atEnd() && l.peek() == '.' && !l.atEnd() && l.Pos+1 < len(l.Text) && unicode.IsDigit(l.peekNext()) {
+		// Consume decimal point
 		value += string(l.advance())
-
-		// Consume decimal digits
+		// Scan fractional part
 		for !l.atEnd() && unicode.IsDigit(l.peek()) {
 			value += string(l.advance())
 		}
@@ -161,5 +158,5 @@ func (l *Lexer) scanNumber(prefix string, startLine int, startColumn int) (Token
 		Value:  value,
 		Line:   startLine,
 		Column: startColumn,
-	}, nil
+	}
 }

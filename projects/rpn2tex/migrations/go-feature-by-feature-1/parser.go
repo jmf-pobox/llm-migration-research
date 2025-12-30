@@ -1,158 +1,140 @@
-package rpn2tex
+package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
-// Parser parses tokens into an AST using RPN semantics.
+// Parser parses tokens into an AST
 type Parser struct {
-	lexer   *Lexer
-	current Token
+	tokens []Token
+	pos    int
 }
 
-// NewParser creates a new parser for the given lexer.
-func NewParser(lexer *Lexer) *Parser {
+// NewParser creates a new parser for the given tokens
+func NewParser(tokens []Token) *Parser {
 	return &Parser{
-		lexer: lexer,
+		tokens: tokens,
+		pos:    0,
 	}
 }
 
-// Parse parses the input and returns the root AST node.
+// Parse parses the tokens into an expression AST
 func (p *Parser) Parse() (Expr, error) {
-	stack := []Expr{}
+	var stack []Expr
 
-	// Initialize by getting first token
-	if err := p.advance(); err != nil {
-		return nil, err
-	}
+	for p.pos < len(p.tokens) {
+		token := p.tokens[p.pos]
 
-	for p.current.Type != TokenEOF {
-		switch p.current.Type {
-		case TokenNumber:
-			// Create number node and push to stack
-			node := &NumberNode{
-				Line:   p.current.Line,
-				Column: p.current.Column,
-				Value:  p.current.Value,
+		switch token.Type {
+		case NUMBER:
+			numNode := &Number{
+				Value:  token.Value,
+				Line:   token.Line,
+				Column: token.Column,
 			}
-			stack = append(stack, node)
-			if err := p.advance(); err != nil {
-				return nil, err
-			}
-		case TokenPlus:
-			// Binary operator: pop two operands, create BinaryOp, push result
+			stack = append(stack, numNode)
+			p.pos++
+		case PLUS:
 			if len(stack) < 2 {
-				return nil, fmt.Errorf("Operator '+' requires two operands")
+				return nil, &ParserError{
+					Message: fmt.Sprintf("Operator '%s' requires two operands", token.Value),
+					Token:   token,
+				}
 			}
-			// Pop right operand first (stack order)
+			// Pop right then left (RPN order)
 			right := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Pop left operand
 			left := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Create binary operation node
-			opNode := &BinaryOpNode{
-				Line:     p.current.Line,
-				Column:   p.current.Column,
+
+			opNode := &BinaryOp{
 				Operator: "+",
 				Left:     left,
 				Right:    right,
+				Line:     token.Line,
+				Column:   token.Column,
 			}
 			stack = append(stack, opNode)
-			if err := p.advance(); err != nil {
-				return nil, err
-			}
-		case TokenMinus:
-			// Binary operator: pop two operands, create BinaryOp, push result
+			p.pos++
+		case MINUS:
 			if len(stack) < 2 {
-				return nil, fmt.Errorf("Operator '-' requires two operands")
+				return nil, &ParserError{
+					Message: fmt.Sprintf("Operator '%s' requires two operands", token.Value),
+					Token:   token,
+				}
 			}
-			// Pop right operand first (stack order) - CRITICAL for non-commutative ops
+			// Pop right then left (RPN order)
 			right := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Pop left operand
 			left := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Create binary operation node
-			opNode := &BinaryOpNode{
-				Line:     p.current.Line,
-				Column:   p.current.Column,
+
+			opNode := &BinaryOp{
 				Operator: "-",
 				Left:     left,
 				Right:    right,
+				Line:     token.Line,
+				Column:   token.Column,
 			}
 			stack = append(stack, opNode)
-			if err := p.advance(); err != nil {
-				return nil, err
-			}
-		case TokenTimes:
-			// Binary operator: pop two operands, create BinaryOp, push result
+			p.pos++
+		case MULTIPLY:
 			if len(stack) < 2 {
-				return nil, fmt.Errorf("Operator '*' requires two operands")
+				return nil, &ParserError{
+					Message: fmt.Sprintf("Operator '%s' requires two operands", token.Value),
+					Token:   token,
+				}
 			}
-			// Pop right operand first (stack order)
+			// Pop right then left (RPN order)
 			right := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Pop left operand
 			left := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Create binary operation node
-			opNode := &BinaryOpNode{
-				Line:     p.current.Line,
-				Column:   p.current.Column,
+
+			opNode := &BinaryOp{
 				Operator: "*",
 				Left:     left,
 				Right:    right,
+				Line:     token.Line,
+				Column:   token.Column,
 			}
 			stack = append(stack, opNode)
-			if err := p.advance(); err != nil {
-				return nil, err
-			}
-		case TokenDivide:
-			// Binary operator: pop two operands, create BinaryOp, push result
+			p.pos++
+		case DIVIDE:
 			if len(stack) < 2 {
-				return nil, fmt.Errorf("Operator '/' requires two operands")
+				return nil, &ParserError{
+					Message: fmt.Sprintf("Operator '%s' requires two operands", token.Value),
+					Token:   token,
+				}
 			}
-			// Pop right operand first (stack order) - CRITICAL for non-commutative ops
+			// Pop right then left (RPN order)
 			right := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Pop left operand
 			left := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			// Create binary operation node
-			opNode := &BinaryOpNode{
-				Line:     p.current.Line,
-				Column:   p.current.Column,
+
+			opNode := &BinaryOp{
 				Operator: "/",
 				Left:     left,
 				Right:    right,
+				Line:     token.Line,
+				Column:   token.Column,
 			}
 			stack = append(stack, opNode)
-			if err := p.advance(); err != nil {
-				return nil, err
-			}
+			p.pos++
 		default:
-			return nil, fmt.Errorf("unexpected token: %s", p.current.Type)
+			return nil, &ParserError{
+				Message: fmt.Sprintf("Unknown token type: %v", token.Type),
+				Token:   token,
+			}
 		}
 	}
 
-	// Should have exactly one expression on stack
+	// Should have exactly one expression on the stack
 	if len(stack) == 0 {
 		return nil, fmt.Errorf("empty input")
 	}
-	if len(stack) != 1 {
-		return nil, fmt.Errorf("incomplete expression: %d operands remaining", len(stack))
+	if len(stack) > 1 {
+		return nil, fmt.Errorf("incomplete expression: too many operands")
 	}
 
 	return stack[0], nil
-}
-
-// advance moves to the next token.
-func (p *Parser) advance() error {
-	token, err := p.lexer.NextToken()
-	if err != nil {
-		return err
-	}
-	p.current = token
-	return nil
 }

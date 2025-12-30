@@ -1,191 +1,176 @@
-//! Abstract Syntax Tree node types for RPN expressions.
+//! Abstract Syntax Tree node types for mathematical expressions.
 //!
-//! This module defines the AST structure used by the parser to represent
-//! parsed RPN expressions as an immutable tree structure. Each node tracks
-//! its position in the source text for error reporting.
-//!
-//! # Structure
-//!
-//! The AST is represented by the [`Expr`] enum, which can be:
-//! - A numeric literal ([`Expr::Number`])
-//! - A binary operation ([`Expr::BinaryOp`]) with left and right operands
-//!
-//! # Examples
-//!
-//! ```
-//! use rpn2tex::ast::Expr;
-//!
-//! // Create a number node
-//! let num = Expr::Number {
-//!     line: 1,
-//!     column: 1,
-//!     value: "42".to_string(),
-//! };
-//!
-//! // Create a binary operation: 2 + 3
-//! let left = Box::new(Expr::Number {
-//!     line: 1,
-//!     column: 1,
-//!     value: "2".to_string(),
-//! });
-//! let right = Box::new(Expr::Number {
-//!     line: 1,
-//!     column: 3,
-//!     value: "3".to_string(),
-//! });
-//! let add_expr = Expr::BinaryOp {
-//!     line: 1,
-//!     column: 5,
-//!     operator: "+".to_string(),
-//!     left,
-//!     right,
-//! };
-//! ```
+//! This module defines the core AST structures used to represent parsed
+//! mathematical expressions in RPN (Reverse Polish Notation) format.
 
-/// An expression node in the abstract syntax tree.
-///
-/// Represents either a numeric literal or a binary operation. Each variant
-/// includes position information (line and column) for error reporting.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Expr {
-    /// A numeric literal value.
+/// Represents an operator in a binary operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operator {
+    /// Addition operator (+)
+    Add,
+    /// Subtraction operator (-)
+    Subtract,
+    /// Multiplication operator (*)
+    Multiply,
+    /// Division operator (/)
+    Divide,
+    /// Exponentiation operator (^)
+    Power,
+}
+
+impl Operator {
+    /// Returns the precedence level of the operator.
     ///
-    /// # Fields
-    ///
-    /// * `line` - The line number where this number appears (1-indexed)
-    /// * `column` - The column number where this number appears (1-indexed)
-    /// * `value` - The string representation of the numeric value
+    /// Higher values indicate higher precedence. Multiplication and division
+    /// have precedence 2, while addition and subtraction have precedence 1.
+    /// Power has the highest precedence of 3.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Expr;
+    /// use rpn2tex::ast::Operator;
     ///
-    /// let num = Expr::Number {
-    ///     line: 1,
-    ///     column: 1,
-    ///     value: "3.14".to_string(),
-    /// };
+    /// assert_eq!(Operator::Multiply.precedence(), 2);
+    /// assert_eq!(Operator::Add.precedence(), 1);
+    /// assert_eq!(Operator::Power.precedence(), 3);
     /// ```
-    Number {
-        line: u32,
-        column: u32,
-        value: String,
-    },
+    #[must_use]
+    pub const fn precedence(self) -> u8 {
+        match self {
+            Self::Add | Self::Subtract => 1,
+            Self::Multiply | Self::Divide => 2,
+            Self::Power => 3,
+        }
+    }
 
-    /// A binary operation with two operands.
-    ///
-    /// # Fields
-    ///
-    /// * `line` - The line number where this operator appears (1-indexed)
-    /// * `column` - The column number where this operator appears (1-indexed)
-    /// * `operator` - The operator symbol (e.g., "+", "-", "*", "/")
-    /// * `left` - The left operand expression
-    /// * `right` - The right operand expression
+    /// Returns the LaTeX representation of the operator.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Expr;
+    /// use rpn2tex::ast::Operator;
     ///
-    /// // Represents: 5 + 3
-    /// let left = Box::new(Expr::Number {
-    ///     line: 1,
-    ///     column: 1,
-    ///     value: "5".to_string(),
-    /// });
-    /// let right = Box::new(Expr::Number {
-    ///     line: 1,
-    ///     column: 3,
-    ///     value: "3".to_string(),
-    /// });
-    /// let expr = Expr::BinaryOp {
-    ///     line: 1,
-    ///     column: 5,
-    ///     operator: "+".to_string(),
-    ///     left,
-    ///     right,
-    /// };
+    /// assert_eq!(Operator::Add.to_latex(), "+");
+    /// assert_eq!(Operator::Multiply.to_latex(), "\\times");
+    /// assert_eq!(Operator::Divide.to_latex(), "\\div");
     /// ```
+    #[must_use]
+    pub const fn to_latex(self) -> &'static str {
+        match self {
+            Self::Add => "+",
+            Self::Subtract => "-",
+            Self::Multiply => "\\times",
+            Self::Divide => "\\div",
+            Self::Power => "^",
+        }
+    }
+}
+
+/// Represents a node in the Abstract Syntax Tree.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AstNode {
+    /// A numeric literal value
+    Number(f64),
+    /// A binary operation with left operand, operator, and right operand
     BinaryOp {
-        line: u32,
-        column: u32,
-        operator: String,
-        left: Box<Expr>,
-        right: Box<Expr>,
+        /// Left operand
+        left: Box<AstNode>,
+        /// The operator
+        operator: Operator,
+        /// Right operand
+        right: Box<AstNode>,
     },
 }
 
-impl Expr {
-    /// Returns the position (line, column) of this expression node.
-    ///
-    /// # Returns
-    ///
-    /// A tuple of `(line, column)` where both are 1-indexed.
+impl AstNode {
+    /// Creates a new number node.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Expr;
+    /// use rpn2tex::ast::AstNode;
     ///
-    /// let num = Expr::Number {
-    ///     line: 5,
-    ///     column: 10,
-    ///     value: "42".to_string(),
-    /// };
-    ///
-    /// assert_eq!(num.position(), (5, 10));
+    /// let node = AstNode::number(42.0);
+    /// assert!(matches!(node, AstNode::Number(x) if x == 42.0));
     /// ```
     #[must_use]
-    pub const fn position(&self) -> (u32, u32) {
-        match self {
-            Self::Number { line, column, .. } | Self::BinaryOp { line, column, .. } => {
-                (*line, *column)
-            }
+    pub const fn number(value: f64) -> Self {
+        Self::Number(value)
+    }
+
+    /// Creates a new binary operation node.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rpn2tex::ast::{AstNode, Operator};
+    ///
+    /// let left = AstNode::number(5.0);
+    /// let right = AstNode::number(3.0);
+    /// let node = AstNode::binary_op(left, Operator::Add, right);
+    /// ```
+    #[must_use]
+    pub fn binary_op(left: Self, operator: Operator, right: Self) -> Self {
+        Self::BinaryOp {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right),
         }
     }
 
-    /// Returns the line number where this expression appears.
+    /// Returns true if this node is a number.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Expr;
+    /// use rpn2tex::ast::AstNode;
     ///
-    /// let num = Expr::Number {
-    ///     line: 5,
-    ///     column: 10,
-    ///     value: "42".to_string(),
-    /// };
-    ///
-    /// assert_eq!(num.line(), 5);
+    /// let node = AstNode::number(42.0);
+    /// assert!(node.is_number());
     /// ```
     #[must_use]
-    pub const fn line(&self) -> u32 {
-        match self {
-            Self::Number { line, .. } | Self::BinaryOp { line, .. } => *line,
-        }
+    pub const fn is_number(&self) -> bool {
+        matches!(self, Self::Number(_))
     }
 
-    /// Returns the column number where this expression appears.
+    /// Returns true if this node is a binary operation.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::Expr;
+    /// use rpn2tex::ast::{AstNode, Operator};
     ///
-    /// let num = Expr::Number {
-    ///     line: 5,
-    ///     column: 10,
-    ///     value: "42".to_string(),
-    /// };
-    ///
-    /// assert_eq!(num.column(), 10);
+    /// let node = AstNode::binary_op(
+    ///     AstNode::number(5.0),
+    ///     Operator::Add,
+    ///     AstNode::number(3.0),
+    /// );
+    /// assert!(node.is_binary_op());
     /// ```
     #[must_use]
-    pub const fn column(&self) -> u32 {
+    pub const fn is_binary_op(&self) -> bool {
+        matches!(self, Self::BinaryOp { .. })
+    }
+
+    /// Returns the operator if this is a binary operation node.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rpn2tex::ast::{AstNode, Operator};
+    ///
+    /// let node = AstNode::binary_op(
+    ///     AstNode::number(5.0),
+    ///     Operator::Multiply,
+    ///     AstNode::number(3.0),
+    /// );
+    /// assert_eq!(node.operator(), Some(Operator::Multiply));
+    /// ```
+    #[must_use]
+    pub const fn operator(&self) -> Option<Operator> {
         match self {
-            Self::Number { column, .. } | Self::BinaryOp { column, .. } => *column,
+            Self::BinaryOp { operator, .. } => Some(*operator),
+            Self::Number(_) => None,
         }
     }
 }
@@ -195,121 +180,102 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_number_position() {
-        let num = Expr::Number {
-            line: 5,
-            column: 10,
-            value: "42".to_string(),
-        };
-
-        assert_eq!(num.position(), (5, 10));
-        assert_eq!(num.line(), 5);
-        assert_eq!(num.column(), 10);
+    fn test_operator_precedence() {
+        assert_eq!(Operator::Add.precedence(), 1);
+        assert_eq!(Operator::Subtract.precedence(), 1);
+        assert_eq!(Operator::Multiply.precedence(), 2);
+        assert_eq!(Operator::Divide.precedence(), 2);
+        assert_eq!(Operator::Power.precedence(), 3);
     }
 
     #[test]
-    fn test_binary_op_position() {
-        let left = Box::new(Expr::Number {
-            line: 1,
-            column: 1,
-            value: "2".to_string(),
-        });
-        let right = Box::new(Expr::Number {
-            line: 1,
-            column: 3,
-            value: "3".to_string(),
-        });
-        let op = Expr::BinaryOp {
-            line: 1,
-            column: 5,
-            operator: "+".to_string(),
-            left,
-            right,
-        };
-
-        assert_eq!(op.position(), (1, 5));
-        assert_eq!(op.line(), 1);
-        assert_eq!(op.column(), 5);
+    fn test_operator_precedence_ordering() {
+        assert!(Operator::Multiply.precedence() > Operator::Add.precedence());
+        assert!(Operator::Divide.precedence() > Operator::Subtract.precedence());
+        assert!(Operator::Power.precedence() > Operator::Multiply.precedence());
     }
 
     #[test]
-    fn test_clone() {
-        let num = Expr::Number {
-            line: 1,
-            column: 1,
-            value: "42".to_string(),
-        };
-
-        let cloned = num.clone();
-        assert_eq!(num, cloned);
+    fn test_operator_to_latex() {
+        assert_eq!(Operator::Add.to_latex(), "+");
+        assert_eq!(Operator::Subtract.to_latex(), "-");
+        assert_eq!(Operator::Multiply.to_latex(), "\\times");
+        assert_eq!(Operator::Divide.to_latex(), "\\div");
+        assert_eq!(Operator::Power.to_latex(), "^");
     }
 
     #[test]
-    fn test_debug() {
-        let num = Expr::Number {
-            line: 1,
-            column: 1,
-            value: "42".to_string(),
-        };
-
-        let debug_str = format!("{num:?}");
-        assert!(debug_str.contains("Number"));
-        assert!(debug_str.contains("42"));
+    fn test_ast_node_number() {
+        let node = AstNode::number(42.0);
+        assert!(matches!(node, AstNode::Number(x) if x == 42.0));
+        assert!(node.is_number());
+        assert!(!node.is_binary_op());
+        assert_eq!(node.operator(), None);
     }
 
     #[test]
-    fn test_equality() {
-        let num1 = Expr::Number {
-            line: 1,
-            column: 1,
-            value: "42".to_string(),
-        };
-        let num2 = Expr::Number {
-            line: 1,
-            column: 1,
-            value: "42".to_string(),
-        };
-        let num3 = Expr::Number {
-            line: 1,
-            column: 1,
-            value: "43".to_string(),
-        };
+    fn test_ast_node_binary_op() {
+        let left = AstNode::number(5.0);
+        let right = AstNode::number(3.0);
+        let node = AstNode::binary_op(left, Operator::Add, right);
 
-        assert_eq!(num1, num2);
-        assert_ne!(num1, num3);
+        assert!(node.is_binary_op());
+        assert!(!node.is_number());
+        assert_eq!(node.operator(), Some(Operator::Add));
     }
 
     #[test]
-    fn test_nested_binary_op() {
-        // Represents: (2 + 3) * 4
-        let left = Box::new(Expr::BinaryOp {
-            line: 1,
-            column: 3,
-            operator: "+".to_string(),
-            left: Box::new(Expr::Number {
-                line: 1,
-                column: 1,
-                value: "2".to_string(),
-            }),
-            right: Box::new(Expr::Number {
-                line: 1,
-                column: 3,
-                value: "3".to_string(),
-            }),
-        });
-        let right = Box::new(Expr::Number {
-            line: 1,
-            column: 5,
-            value: "4".to_string(),
-        });
-        let mul = Expr::BinaryOp {
-            line: 1,
-            column: 7,
-            operator: "*".to_string(),
-            left,
-            right,
-        };
+    fn test_ast_node_nested_binary_op() {
+        // (5 + 3) * 2
+        let inner = AstNode::binary_op(AstNode::number(5.0), Operator::Add, AstNode::number(3.0));
+        let outer = AstNode::binary_op(inner, Operator::Multiply, AstNode::number(2.0));
 
-        assert_eq!(mul.position(), (1, 7));
+        assert!(outer.is_binary_op());
+        assert_eq!(outer.operator(), Some(Operator::Multiply));
+    }
+
+    #[test]
+    fn test_ast_node_equality() {
+        let node1 = AstNode::number(42.0);
+        let node2 = AstNode::number(42.0);
+        let node3 = AstNode::number(43.0);
+
+        assert_eq!(node1, node2);
+        assert_ne!(node1, node3);
+    }
+
+    #[test]
+    fn test_ast_node_clone() {
+        let node = AstNode::binary_op(
+            AstNode::number(5.0),
+            Operator::Multiply,
+            AstNode::number(3.0),
+        );
+        let cloned = node.clone();
+
+        assert_eq!(node, cloned);
+    }
+
+    #[test]
+    fn test_complex_expression() {
+        // ((2 + 3) * 4) - 5
+        let add = AstNode::binary_op(AstNode::number(2.0), Operator::Add, AstNode::number(3.0));
+        let mult = AstNode::binary_op(add, Operator::Multiply, AstNode::number(4.0));
+        let sub = AstNode::binary_op(mult, Operator::Subtract, AstNode::number(5.0));
+
+        assert!(sub.is_binary_op());
+        assert_eq!(sub.operator(), Some(Operator::Subtract));
+    }
+
+    #[test]
+    fn test_floating_point_numbers() {
+        let node = AstNode::number(3.14159);
+        assert!(matches!(node, AstNode::Number(x) if (x - 3.14159).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_negative_numbers() {
+        let node = AstNode::number(-42.0);
+        assert!(matches!(node, AstNode::Number(x) if x == -42.0));
     }
 }

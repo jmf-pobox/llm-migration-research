@@ -1,178 +1,104 @@
-//! Command-line interface for rpn2tex.
+//! RPN to LaTeX Converter CLI
 //!
-//! This CLI orchestrates the complete RPN to LaTeX pipeline:
-//! 1. Read input from file or stdin
-//! 2. Tokenize the input (`Lexer`)
-//! 3. Parse tokens into AST (`Parser`)
-//! 4. Generate LaTeX code (`LaTeXGenerator`)
-//! 5. Write output to file or stdout
+//! Command-line interface for converting Reverse Polish Notation (RPN)
+//! mathematical expressions to LaTeX format.
 //!
 //! # Usage
 //!
-//! ```bash
-//! rpn2tex <input> [-o <output>]
+//! ```text
+//! rpn2tex "<expression>"
 //! ```
 //!
 //! # Examples
 //!
-//! ```bash
-//! # Read from file, write to stdout
-//! rpn2tex input.rpn
+//! ```text
+//! $ rpn2tex "5 3 +"
+//! $5 + 3$
 //!
-//! # Read from file, write to file
-//! rpn2tex input.rpn -o output.tex
-//!
-//! # Read from stdin, write to stdout
-//! echo "5 3 +" | rpn2tex -
+//! $ rpn2tex "5 3 + 2 *"
+//! $( 5 + 3 ) \times 2$
 //! ```
 
-use std::fs;
-use std::io::{self, Read};
+use rpn2tex::{LatexGenerator, Lexer, Parser, Rpn2TexError};
+use std::env;
 use std::process;
 
-use clap::Parser;
-use rpn2tex::error::ErrorFormatter;
-use rpn2tex::latex::LaTeXGenerator;
-use rpn2tex::lexer::Lexer;
-use rpn2tex::parser::Parser as RpnParser;
+/// Run the RPN to LaTeX conversion pipeline
+///
+/// # Arguments
+///
+/// * `input` - The RPN expression to convert
+///
+/// # Returns
+///
+/// The LaTeX output string or an error
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lexical analysis fails (invalid characters)
+/// - Parsing fails (invalid RPN syntax)
+fn run(input: &str) -> Result<String, Rpn2TexError> {
+    // Lexer: tokenize input
+    let lexer = Lexer::new(input);
+    let tokens = lexer.tokenize()?;
 
-/// Convert Reverse Polish Notation expressions to LaTeX
-#[derive(Parser, Debug)]
-#[command(name = "rpn2tex")]
-#[command(about = "Convert Reverse Polish Notation expressions to LaTeX", long_about = None)]
-struct Args {
-    /// Input file path or "-" for stdin
-    input: String,
+    // Parser: build AST from tokens
+    let parser = Parser::new(tokens);
+    let ast = parser.parse()?;
 
-    /// Output file path (default: stdout)
-    #[arg(short, long)]
-    output: Option<String>,
+    // LaTeX Generator: produce LaTeX output
+    let generator = LatexGenerator::new();
+    let latex = generator.generate(&ast);
+
+    Ok(latex)
+}
+
+/// Print usage information to stderr
+fn print_usage() {
+    eprintln!("Usage: rpn2tex \"<expression>\"");
+    eprintln!();
+    eprintln!("Convert RPN expressions to LaTeX format.");
+    eprintln!();
+    eprintln!("Examples:");
+    eprintln!("  rpn2tex \"5 3 +\"         # Output: $5 + 3$");
+    eprintln!("  rpn2tex \"5 3 + 2 *\"     # Output: $( 5 + 3 ) \\times 2$");
+    eprintln!("  rpn2tex \"4 7 *\"         # Output: $4 \\times 7$");
+    eprintln!("  rpn2tex \"10 2 /\"        # Output: $10 \\div 2$");
 }
 
 fn main() {
-    let args = Args::parse();
-    let exit_code = run(&args);
-    process::exit(exit_code);
-}
+    // Parse command-line arguments
+    let args: Vec<String> = env::args().collect();
 
-/// Runs the main CLI logic.
-///
-/// # Returns
-///
-/// Exit code: 0 for success, 1 for error
-fn run(args: &Args) -> i32 {
-    // Read input
-    let input_text = match read_input(&args.input) {
-        Ok(text) => text,
-        Err(e) => {
-            eprintln!("{e}");
-            return 1;
-        }
-    };
-
-    // Create error formatter for pretty error messages
-    let formatter = ErrorFormatter::new(input_text.clone());
-
-    // Tokenize
-    let mut lexer = Lexer::new(input_text);
-    let tokens = match lexer.tokenize() {
-        Ok(t) => t,
-        Err(e) => {
-            let error_msg = formatter.format_error(&e.message, e.line, e.column);
-            eprintln!("{error_msg}");
-            return 1;
-        }
-    };
-
-    // Parse
-    let mut parser = RpnParser::new(tokens);
-    let ast = match parser.parse() {
-        Ok(a) => a,
-        Err(e) => {
-            let error_msg = formatter.format_error(&e.message, e.token.line(), e.token.column());
-            eprintln!("{error_msg}");
-            return 1;
-        }
-    };
-
-    // Generate LaTeX
-    let generator = LaTeXGenerator::new();
-    let latex = generator.generate(&ast);
-
-    // Write output
-    if let Err(e) = write_output(args.output.as_ref(), &latex) {
-        eprintln!("{e}");
-        return 1;
+    // Check if expression argument is provided
+    if args.len() < 2 {
+        eprintln!("Error: Missing required argument: <expression>");
+        eprintln!();
+        print_usage();
+        process::exit(1);
     }
 
-    0
-}
-
-/// Reads input from a file or stdin.
-///
-/// # Arguments
-///
-/// * `path` - File path or "-" for stdin
-///
-/// # Returns
-///
-/// The input text content
-///
-/// # Errors
-///
-/// Returns error message string if reading fails
-fn read_input(path: &str) -> Result<String, String> {
-    if path == "-" {
-        // Read from stdin
-        let mut buffer = String::new();
-        io::stdin()
-            .read_to_string(&mut buffer)
-            .map_err(|e| format!("Error reading from stdin: {e}"))?;
-        Ok(buffer)
-    } else {
-        // Read from file
-        fs::read_to_string(path).map_err(|e| match e.kind() {
-            io::ErrorKind::NotFound => format!("Error: Input file not found: {path}"),
-            io::ErrorKind::PermissionDenied => {
-                format!("Error: Permission denied reading: {path}")
-            }
-            io::ErrorKind::IsADirectory => {
-                format!("Error: Expected a file, got a directory: {path}")
-            }
-            _ => format!("Error reading file {path}: {e}"),
-        })
+    // Handle help flag
+    if args[1] == "-h" || args[1] == "--help" {
+        print_usage();
+        process::exit(0);
     }
-}
 
-/// Writes output to a file or stdout.
-///
-/// # Arguments
-///
-/// * `path` - Optional file path. If None, writes to stdout
-/// * `content` - The content to write
-///
-/// # Errors
-///
-/// Returns error message string if writing fails
-fn write_output(path: Option<&String>, content: &str) -> Result<(), String> {
-    if let Some(output_path) = path {
-        // Write to file
-        let content_with_newline = format!("{content}\n");
-        fs::write(output_path, content_with_newline).map_err(|e| match e.kind() {
-            io::ErrorKind::PermissionDenied => {
-                format!("Error: Permission denied writing: {output_path}")
-            }
-            io::ErrorKind::IsADirectory => {
-                format!("Error: Cannot write to directory: {output_path}")
-            }
-            _ => format!("Error writing to file {output_path}: {e}"),
-        })?;
-        eprintln!("Generated: {output_path}");
-        Ok(())
-    } else {
-        // Write to stdout
-        println!("{content}");
-        Ok(())
+    let input = &args[1];
+
+    // Run the conversion pipeline
+    match run(input) {
+        Ok(latex) => {
+            // Print result to stdout
+            println!("{latex}");
+            process::exit(0);
+        }
+        Err(err) => {
+            // Print error to stderr and exit with code 1
+            eprintln!("{err}");
+            process::exit(1);
+        }
     }
 }
 
@@ -181,15 +107,148 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_input_stdin() {
-        // Test that stdin path is recognized
-        assert_eq!("-", "-");
+    fn test_run_simple_addition() {
+        let result = run("5 3 +").unwrap();
+        assert_eq!(result, "$5 + 3$");
     }
 
     #[test]
-    fn test_write_output_stdout() {
-        // Writing to stdout should succeed
-        let result = write_output(None, "$5 + 3$");
-        assert!(result.is_ok());
+    fn test_run_simple_subtraction() {
+        let result = run("5 3 -").unwrap();
+        assert_eq!(result, "$5 - 3$");
+    }
+
+    #[test]
+    fn test_run_simple_multiplication() {
+        let result = run("4 7 *").unwrap();
+        assert_eq!(result, "$4 \\times 7$");
+    }
+
+    #[test]
+    fn test_run_simple_division() {
+        let result = run("10 2 /").unwrap();
+        assert_eq!(result, "$10 \\div 2$");
+    }
+
+    #[test]
+    fn test_run_with_precedence() {
+        let result = run("5 3 + 2 *").unwrap();
+        assert_eq!(result, "$( 5 + 3 ) \\times 2$");
+    }
+
+    #[test]
+    fn test_run_no_parens_needed() {
+        let result = run("5 3 * 2 +").unwrap();
+        assert_eq!(result, "$5 \\times 3 + 2$");
+    }
+
+    #[test]
+    fn test_run_division_multiplication_chain() {
+        let result = run("10 2 / 5 *").unwrap();
+        assert_eq!(result, "$10 \\div 2 \\times 5$");
+    }
+
+    #[test]
+    fn test_run_subtraction_chain() {
+        let result = run("5 3 - 2 -").unwrap();
+        assert_eq!(result, "$5 - 3 - 2$");
+    }
+
+    #[test]
+    fn test_run_floating_point() {
+        let result = run("3.14 2 *").unwrap();
+        assert_eq!(result, "$3.14 \\times 2$");
+    }
+
+    #[test]
+    fn test_run_floating_point_addition() {
+        let result = run("1.5 0.5 +").unwrap();
+        assert_eq!(result, "$1.5 + 0.5$");
+    }
+
+    #[test]
+    fn test_run_complex_precedence() {
+        let result = run("10 2 / 3 + 4 *").unwrap();
+        assert_eq!(result, "$( 10 \\div 2 + 3 ) \\times 4$");
+    }
+
+    #[test]
+    fn test_run_both_operands_need_parens() {
+        let result = run("1 2 + 3 4 + *").unwrap();
+        assert_eq!(result, "$( 1 + 2 ) \\times ( 3 + 4 )$");
+    }
+
+    #[test]
+    fn test_run_invalid_character_error() {
+        let result = run("2 3 ^");
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::LexerError {
+                message,
+                line,
+                column,
+            }) => {
+                assert!(message.contains("Unexpected character"));
+                assert_eq!(line, 1);
+                assert_eq!(column, 5);
+            }
+            _ => panic!("Expected LexerError"),
+        }
+    }
+
+    #[test]
+    fn test_run_parser_error_insufficient_operands() {
+        let result = run("3 +");
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { .. }) => {
+                // Expected parser error
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_run_parser_error_too_many_operands() {
+        let result = run("5 3 2");
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { .. }) => {
+                // Expected parser error
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_run_empty_expression() {
+        let result = run("");
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { .. }) => {
+                // Expected parser error
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_error_display_format_lexer() {
+        let err = Rpn2TexError::lexer_error("Unexpected character '^'", 1, 5);
+        let display = format!("{err}");
+        assert_eq!(
+            display,
+            "[LexerError] at line 1, column 5: Unexpected character '^'"
+        );
+    }
+
+    #[test]
+    fn test_error_display_format_parser() {
+        let err = Rpn2TexError::parser_error("Not enough operands", 1, 3);
+        let display = format!("{err}");
+        assert_eq!(
+            display,
+            "[ParserError] at line 1, column 3: Not enough operands"
+        );
     }
 }

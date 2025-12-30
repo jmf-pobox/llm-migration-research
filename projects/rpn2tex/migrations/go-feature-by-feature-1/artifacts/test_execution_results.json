@@ -1,0 +1,216 @@
+{
+  "timestamp": "2025-12-29T14:04:13.882369",
+  "total_tests": 23,
+  "passed": 20,
+  "failed": 0,
+  "expected_errors": 3,
+  "results": [
+    {
+      "input": "5",
+      "expected": "$5$",
+      "actual": "$5$",
+      "category": "numbers",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "3.14",
+      "expected": "$3.14$",
+      "actual": "$3.14$",
+      "category": "numbers",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "5 3 +",
+      "expected": "$5 + 3$",
+      "actual": "$5 + 3$",
+      "category": "addition",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "1 2 + 3 + 4 +",
+      "expected": "$1 + 2 + 3 + 4$",
+      "actual": "$1 + 2 + 3 + 4$",
+      "category": "addition",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "5 3 -",
+      "expected": "$5 - 3$",
+      "actual": "$5 - 3$",
+      "category": "subtraction",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "5 3 - 2 -",
+      "expected": "$5 - 3 - 2$",
+      "actual": "$5 - 3 - 2$",
+      "category": "subtraction",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "4 7 *",
+      "expected": "$4 \\times 7$",
+      "actual": "$4 \\times 7$",
+      "category": "multiplication",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "2 3 4 * +",
+      "expected": "$2 + 3 \\times 4$",
+      "actual": "$2 + 3 \\times 4$",
+      "category": "multiplication",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "5 3 * 2 +",
+      "expected": "$5 \\times 3 + 2$",
+      "actual": "$5 \\times 3 + 2$",
+      "category": "multiplication",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "2 3 * 4 +",
+      "expected": "$2 \\times 3 + 4$",
+      "actual": "$2 \\times 3 + 4$",
+      "category": "multiplication",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "10 2 /",
+      "expected": "$10 \\div 2$",
+      "actual": "$10 \\div 2$",
+      "category": "division",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "100 10 / 5 / 2 /",
+      "expected": "$100 \\div 10 \\div 5 \\div 2$",
+      "actual": "$100 \\div 10 \\div 5 \\div 2$",
+      "category": "division",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "10 2 / 5 *",
+      "expected": "$10 \\div 2 \\times 5$",
+      "actual": "$10 \\div 2 \\times 5$",
+      "category": "division",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "5 3 + 2 *",
+      "expected": "$( 5 + 3 ) \\times 2$",
+      "actual": "$( 5 + 3 ) \\times 2$",
+      "category": "precedence",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "2 3 + 4 *",
+      "expected": "$( 2 + 3 ) \\times 4$",
+      "actual": "$( 2 + 3 ) \\times 4$",
+      "category": "precedence",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "2 3 4 + *",
+      "expected": "$2 \\times ( 3 + 4 )$",
+      "actual": "$2 \\times ( 3 + 4 )$",
+      "category": "precedence",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "1 2 + 3 4 + *",
+      "expected": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "actual": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "category": "precedence",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "10 2 / 3 + 4 *",
+      "expected": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "actual": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "category": "precedence",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "3.14 2 *",
+      "expected": "$3.14 \\times 2$",
+      "actual": "$3.14 \\times 2$",
+      "category": "decimals",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "1.5 0.5 +",
+      "expected": "$1.5 + 0.5$",
+      "actual": "$1.5 + 0.5$",
+      "category": "decimals",
+      "status": "PASS",
+      "returncode": 0,
+      "stderr": null
+    },
+    {
+      "input": "2 3 ^",
+      "expected": "ERROR",
+      "actual": "ERROR",
+      "category": "exponentiation",
+      "status": "EXPECTED_ERROR",
+      "returncode": 1,
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^\n  |     ^"
+    },
+    {
+      "input": "2 3 ^ 4 *",
+      "expected": "ERROR",
+      "actual": "ERROR",
+      "category": "exponentiation",
+      "status": "EXPECTED_ERROR",
+      "returncode": 1,
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 ^ 4 *\n  |     ^"
+    },
+    {
+      "input": "2 3 4 ^ ^",
+      "expected": "ERROR",
+      "actual": "ERROR",
+      "category": "exponentiation",
+      "status": "EXPECTED_ERROR",
+      "returncode": 1,
+      "stderr": "Error: Unexpected character '^'\n\n1 | 2 3 4 ^ ^\n  |       ^"
+    }
+  ]
+}

@@ -1,36 +1,23 @@
 package com.rpn2tex;
 
 /**
- * Token types recognized by the RPN lexer.
+ * Token types for RPN expression lexer.
  *
- * <p>Each token type represents a distinct lexical element in RPN expressions.
- *
- * <p>Currently supports:
+ * <p>Supported token types:
  * <ul>
- *   <li>NUMBER - Numeric literals (integers and decimals)</li>
- *   <li>PLUS - Addition operator (+)</li>
- *   <li>MINUS - Subtraction operator (-)</li>
- *   <li>MULT - Multiplication operator (*)</li>
- *   <li>DIV - Division operator (/)</li>
- *   <li>EOF - End of input marker</li>
+ *   <li>NUMBER - numeric literals (integers and decimals)</li>
+ *   <li>PLUS - addition operator (+)</li>
+ *   <li>MINUS - subtraction operator (-)</li>
+ *   <li>STAR - multiplication operator (*)</li>
+ *   <li>SLASH - division operator (/)</li>
+ *   <li>EOF - end of file marker</li>
  * </ul>
  */
 public enum TokenType {
-    /** Numeric values: 5, 3.14, -2. */
     NUMBER,
-
-    /** Addition operator: +. */
     PLUS,
-
-    /** Subtraction operator: -. */
     MINUS,
-
-    /** Multiplication operator: *. */
-    MULT,
-
-    /** Division operator: /. */
-    DIV,
-
-    /** End of input. */
+    STAR,
+    SLASH,
     EOF
 }

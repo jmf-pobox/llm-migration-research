@@ -1,40 +1,34 @@
-package rpn2tex
+package main
 
 import (
 	"testing"
 )
 
-// TestParserSimpleNumber tests parsing a single number.
-func TestParserSimpleNumber(t *testing.T) {
+// TestParserSingleNumber tests parsing a single number.
+func TestParserSingleNumber(t *testing.T) {
 	tokens := []Token{
 		{Type: NUMBER, Value: "42", Line: 1, Column: 1},
 		{Type: EOF, Value: "", Line: 1, Column: 3},
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	result, err := parser.Parse()
 
 	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	num, ok := expr.(*Number)
+	num, ok := result.(*Number)
 	if !ok {
-		t.Fatalf("expr type = %T, want *Number", expr)
+		t.Fatalf("Expected Number node, got: %T", result)
 	}
 
 	if num.Value != "42" {
-		t.Errorf("num.Value = %q, want %q", num.Value, "42")
-	}
-	if num.Line != 1 {
-		t.Errorf("num.Line = %d, want %d", num.Line, 1)
-	}
-	if num.Column != 1 {
-		t.Errorf("num.Column = %d, want %d", num.Column, 1)
+		t.Errorf("Expected value '42', got: '%s'", num.Value)
 	}
 }
 
-// TestParserSimpleAddition tests parsing "5 3 +".
+// TestParserSimpleAddition tests parsing a simple addition operation.
 func TestParserSimpleAddition(t *testing.T) {
 	tokens := []Token{
 		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
@@ -44,46 +38,40 @@ func TestParserSimpleAddition(t *testing.T) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	result, err := parser.Parse()
 
 	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	binOp, ok := expr.(*BinaryOp)
+	binOp, ok := result.(*BinaryOp)
 	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
+		t.Fatalf("Expected BinaryOp node, got: %T", result)
 	}
 
 	if binOp.Operator != "+" {
-		t.Errorf("binOp.Operator = %q, want %q", binOp.Operator, "+")
+		t.Errorf("Expected operator '+', got: '%s'", binOp.Operator)
 	}
 
-	// Check left operand
 	left, ok := binOp.Left.(*Number)
-	if !ok {
-		t.Fatalf("binOp.Left type = %T, want *Number", binOp.Left)
-	}
-	if left.Value != "5" {
-		t.Errorf("left.Value = %q, want %q", left.Value, "5")
+	if !ok || left.Value != "5" {
+		t.Errorf("Expected left operand to be Number with value '5'")
 	}
 
-	// Check right operand
 	right, ok := binOp.Right.(*Number)
-	if !ok {
-		t.Fatalf("binOp.Right type = %T, want *Number", binOp.Right)
-	}
-	if right.Value != "3" {
-		t.Errorf("right.Value = %q, want %q", right.Value, "3")
+	if !ok || right.Value != "3" {
+		t.Errorf("Expected right operand to be Number with value '3'")
 	}
 }
 
-// TestParserAllOperators tests all four operators.
+// TestParserAllOperators tests parsing with all operators.
 func TestParserAllOperators(t *testing.T) {
 	tests := []struct {
 		name     string
 		tokens   []Token
 		operator string
+		leftVal  string
+		rightVal string
 	}{
 		{
 			name: "addition",
@@ -94,16 +82,20 @@ func TestParserAllOperators(t *testing.T) {
 				{Type: EOF, Value: "", Line: 1, Column: 6},
 			},
 			operator: "+",
+			leftVal:  "1",
+			rightVal: "2",
 		},
 		{
 			name: "subtraction",
 			tokens: []Token{
-				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-				{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-				{Type: MINUS, Value: "-", Line: 1, Column: 5},
-				{Type: EOF, Value: "", Line: 1, Column: 6},
+				{Type: NUMBER, Value: "10", Line: 1, Column: 1},
+				{Type: NUMBER, Value: "3", Line: 1, Column: 4},
+				{Type: MINUS, Value: "-", Line: 1, Column: 6},
+				{Type: EOF, Value: "", Line: 1, Column: 7},
 			},
 			operator: "-",
+			leftVal:  "10",
+			rightVal: "3",
 		},
 		{
 			name: "multiplication",
@@ -114,6 +106,8 @@ func TestParserAllOperators(t *testing.T) {
 				{Type: EOF, Value: "", Line: 1, Column: 6},
 			},
 			operator: "*",
+			leftVal:  "4",
+			rightVal: "7",
 		},
 		{
 			name: "division",
@@ -124,33 +118,45 @@ func TestParserAllOperators(t *testing.T) {
 				{Type: EOF, Value: "", Line: 1, Column: 7},
 			},
 			operator: "/",
+			leftVal:  "10",
+			rightVal: "2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parser := NewParser(tt.tokens)
-			expr, err := parser.Parse()
+			result, err := parser.Parse()
 
 			if err != nil {
-				t.Fatalf("Parse() error = %v, want nil", err)
+				t.Fatalf("Expected no error, got: %v", err)
 			}
 
-			binOp, ok := expr.(*BinaryOp)
+			binOp, ok := result.(*BinaryOp)
 			if !ok {
-				t.Fatalf("expr type = %T, want *BinaryOp", expr)
+				t.Fatalf("Expected BinaryOp node, got: %T", result)
 			}
 
 			if binOp.Operator != tt.operator {
-				t.Errorf("binOp.Operator = %q, want %q", binOp.Operator, tt.operator)
+				t.Errorf("Expected operator '%s', got: '%s'", tt.operator, binOp.Operator)
+			}
+
+			left, ok := binOp.Left.(*Number)
+			if !ok || left.Value != tt.leftVal {
+				t.Errorf("Expected left operand '%s', got: %v", tt.leftVal, binOp.Left)
+			}
+
+			right, ok := binOp.Right.(*Number)
+			if !ok || right.Value != tt.rightVal {
+				t.Errorf("Expected right operand '%s', got: %v", tt.rightVal, binOp.Right)
 			}
 		})
 	}
 }
 
-// TestParserNestedExpression tests parsing "5 3 + 2 *" which should create:
-// BinaryOp(*, BinaryOp(+, 5, 3), 2)
-func TestParserNestedExpression(t *testing.T) {
+// TestParserChainedOperations tests parsing chained operations.
+func TestParserChainedOperations(t *testing.T) {
+	// Test: 5 3 + 2 * => (5 + 3) * 2
 	tokens := []Token{
 		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
 		{Type: NUMBER, Value: "3", Line: 1, Column: 3},
@@ -161,211 +167,42 @@ func TestParserNestedExpression(t *testing.T) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	result, err := parser.Parse()
 
 	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+		t.Fatalf("Expected no error, got: %v", err)
 	}
 
 	// Root should be multiplication
-	root, ok := expr.(*BinaryOp)
+	root, ok := result.(*BinaryOp)
 	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
-	}
-	if root.Operator != "*" {
-		t.Errorf("root.Operator = %q, want %q", root.Operator, "*")
+		t.Fatalf("Expected root to be BinaryOp, got: %T", result)
 	}
 
-	// Left child should be addition
+	if root.Operator != "*" {
+		t.Errorf("Expected root operator '*', got: '%s'", root.Operator)
+	}
+
+	// Left child should be addition (5 + 3)
 	leftOp, ok := root.Left.(*BinaryOp)
 	if !ok {
-		t.Fatalf("root.Left type = %T, want *BinaryOp", root.Left)
+		t.Fatalf("Expected left child to be BinaryOp, got: %T", root.Left)
 	}
+
 	if leftOp.Operator != "+" {
-		t.Errorf("leftOp.Operator = %q, want %q", leftOp.Operator, "+")
+		t.Errorf("Expected left operator '+', got: '%s'", leftOp.Operator)
 	}
 
-	// Left.Left should be 5
-	leftLeft, ok := leftOp.Left.(*Number)
-	if !ok {
-		t.Fatalf("leftOp.Left type = %T, want *Number", leftOp.Left)
-	}
-	if leftLeft.Value != "5" {
-		t.Errorf("leftLeft.Value = %q, want %q", leftLeft.Value, "5")
-	}
-
-	// Left.Right should be 3
-	leftRight, ok := leftOp.Right.(*Number)
-	if !ok {
-		t.Fatalf("leftOp.Right type = %T, want *Number", leftOp.Right)
-	}
-	if leftRight.Value != "3" {
-		t.Errorf("leftRight.Value = %q, want %q", leftRight.Value, "3")
-	}
-
-	// Right child should be 2
-	right, ok := root.Right.(*Number)
-	if !ok {
-		t.Fatalf("root.Right type = %T, want *Number", root.Right)
-	}
-	if right.Value != "2" {
-		t.Errorf("right.Value = %q, want %q", right.Value, "2")
+	// Right child should be number 2
+	rightNum, ok := root.Right.(*Number)
+	if !ok || rightNum.Value != "2" {
+		t.Errorf("Expected right operand to be Number '2'")
 	}
 }
 
-// TestParserComplexExpression tests parsing "2 3 + 4 *" which creates:
-// BinaryOp(*, BinaryOp(+, 2, 3), 4)
-func TestParserComplexExpression(t *testing.T) {
-	tokens := []Token{
-		{Type: NUMBER, Value: "2", Line: 1, Column: 1},
-		{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-		{Type: PLUS, Value: "+", Line: 1, Column: 5},
-		{Type: NUMBER, Value: "4", Line: 1, Column: 7},
-		{Type: MULT, Value: "*", Line: 1, Column: 9},
-		{Type: EOF, Value: "", Line: 1, Column: 10},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
-	}
-
-	root, ok := expr.(*BinaryOp)
-	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
-	}
-
-	if root.Operator != "*" {
-		t.Errorf("root.Operator = %q, want %q", root.Operator, "*")
-	}
-}
-
-// TestParserDecimalNumbers tests parsing decimal numbers.
-func TestParserDecimalNumbers(t *testing.T) {
-	tokens := []Token{
-		{Type: NUMBER, Value: "3.14", Line: 1, Column: 1},
-		{Type: NUMBER, Value: "2", Line: 1, Column: 6},
-		{Type: MULT, Value: "*", Line: 1, Column: 8},
-		{Type: EOF, Value: "", Line: 1, Column: 9},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
-	}
-
-	binOp, ok := expr.(*BinaryOp)
-	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
-	}
-
-	left, ok := binOp.Left.(*Number)
-	if !ok {
-		t.Fatalf("binOp.Left type = %T, want *Number", binOp.Left)
-	}
-
-	// Verify decimal is preserved as string
-	if left.Value != "3.14" {
-		t.Errorf("left.Value = %q, want %q", left.Value, "3.14")
-	}
-}
-
-// TestParserEmptyExpression tests parsing an empty expression.
-func TestParserEmptyExpression(t *testing.T) {
-	tokens := []Token{
-		{Type: EOF, Value: "", Line: 1, Column: 1},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err == nil {
-		t.Fatalf("Parse() error = nil, want error")
-	}
-
-	if expr != nil {
-		t.Errorf("expr = %v, want nil", expr)
-	}
-
-	parserErr, ok := err.(*ParserError)
-	if !ok {
-		t.Fatalf("err type = %T, want *ParserError", err)
-	}
-
-	if parserErr.Message != "Empty expression" {
-		t.Errorf("err.Message = %q, want %q", parserErr.Message, "Empty expression")
-	}
-}
-
-// TestParserInsufficientOperands tests parsing with insufficient operands.
-func TestParserInsufficientOperands(t *testing.T) {
-	tokens := []Token{
-		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-		{Type: PLUS, Value: "+", Line: 1, Column: 3},
-		{Type: EOF, Value: "", Line: 1, Column: 4},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err == nil {
-		t.Fatalf("Parse() error = nil, want error")
-	}
-
-	if expr != nil {
-		t.Errorf("expr = %v, want nil", expr)
-	}
-
-	parserErr, ok := err.(*ParserError)
-	if !ok {
-		t.Fatalf("err type = %T, want *ParserError", err)
-	}
-
-	expectedMsg := "Operator '+' requires two operands"
-	if parserErr.Message != expectedMsg {
-		t.Errorf("err.Message = %q, want %q", parserErr.Message, expectedMsg)
-	}
-}
-
-// TestParserTooManyValues tests parsing with too many values.
-func TestParserTooManyValues(t *testing.T) {
-	tokens := []Token{
-		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-		{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-		{Type: NUMBER, Value: "2", Line: 1, Column: 5},
-		{Type: PLUS, Value: "+", Line: 1, Column: 7},
-		{Type: EOF, Value: "", Line: 1, Column: 8},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err == nil {
-		t.Fatalf("Parse() error = nil, want error")
-	}
-
-	if expr != nil {
-		t.Errorf("expr = %v, want nil", expr)
-	}
-
-	parserErr, ok := err.(*ParserError)
-	if !ok {
-		t.Fatalf("err type = %T, want *ParserError", err)
-	}
-
-	expectedMsg := "Invalid RPN: 2 values remain on stack (missing operators?)"
-	if parserErr.Message != expectedMsg {
-		t.Errorf("err.Message = %q, want %q", parserErr.Message, expectedMsg)
-	}
-}
-
-// TestParserChainedOperations tests parsing "1 2 + 3 + 4 +" which creates
-// nested BinaryOp nodes for left-associative operations.
-func TestParserChainedOperations(t *testing.T) {
+// TestParserMultipleChainedOperations tests longer chains of operations.
+func TestParserMultipleChainedOperations(t *testing.T) {
+	// Test: 1 2 + 3 + 4 + => ((1 + 2) + 3) + 4
 	tokens := []Token{
 		{Type: NUMBER, Value: "1", Line: 1, Column: 1},
 		{Type: NUMBER, Value: "2", Line: 1, Column: 3},
@@ -378,88 +215,193 @@ func TestParserChainedOperations(t *testing.T) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	result, err := parser.Parse()
 
 	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	// Verify it's a BinaryOp at the root
-	root, ok := expr.(*BinaryOp)
+	// Root should be the final addition
+	root, ok := result.(*BinaryOp)
 	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
+		t.Fatalf("Expected root to be BinaryOp, got: %T", result)
 	}
 
 	if root.Operator != "+" {
-		t.Errorf("root.Operator = %q, want %q", root.Operator, "+")
+		t.Errorf("Expected root operator '+', got: '%s'", root.Operator)
 	}
 
-	// Verify the structure has nested BinaryOp on the left
+	// Right child should be number 4
+	rightNum, ok := root.Right.(*Number)
+	if !ok || rightNum.Value != "4" {
+		t.Errorf("Expected right operand to be Number '4'")
+	}
+
+	// Left should be another BinaryOp
 	_, ok = root.Left.(*BinaryOp)
 	if !ok {
-		t.Errorf("root.Left type = %T, want *BinaryOp", root.Left)
-	}
-
-	// Verify the right is a number
-	rightNum, ok := root.Right.(*Number)
-	if !ok {
-		t.Fatalf("root.Right type = %T, want *Number", root.Right)
-	}
-	if rightNum.Value != "4" {
-		t.Errorf("rightNum.Value = %q, want %q", rightNum.Value, "4")
+		t.Errorf("Expected left child to be BinaryOp")
 	}
 }
 
-// TestParserRightSideParens tests "2 3 4 + *" which creates:
-// BinaryOp(*, 2, BinaryOp(+, 3, 4))
-func TestParserRightSideParens(t *testing.T) {
+// TestParserNotEnoughOperands tests error when operator has insufficient operands.
+func TestParserNotEnoughOperands(t *testing.T) {
+	tests := []struct {
+		name   string
+		tokens []Token
+	}{
+		{
+			name: "operator with no operands",
+			tokens: []Token{
+				{Type: PLUS, Value: "+", Line: 1, Column: 1},
+				{Type: EOF, Value: "", Line: 1, Column: 2},
+			},
+		},
+		{
+			name: "operator with one operand",
+			tokens: []Token{
+				{Type: NUMBER, Value: "5", Line: 1, Column: 1},
+				{Type: PLUS, Value: "+", Line: 1, Column: 3},
+				{Type: EOF, Value: "", Line: 1, Column: 4},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser := NewParser(tt.tokens)
+			_, err := parser.Parse()
+
+			if err == nil {
+				t.Fatal("Expected error for insufficient operands, got nil")
+			}
+
+			parserErr, ok := err.(*ParserError)
+			if !ok {
+				t.Fatalf("Expected ParserError, got: %T", err)
+			}
+
+			if parserErr.Message == "" {
+				t.Error("Expected error message to be non-empty")
+			}
+		})
+	}
+}
+
+// TestParserTooManyOperands tests error when there are too many operands.
+func TestParserTooManyOperands(t *testing.T) {
+	// Test: 5 3 2 (missing operator)
 	tokens := []Token{
-		{Type: NUMBER, Value: "2", Line: 1, Column: 1},
+		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
 		{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-		{Type: NUMBER, Value: "4", Line: 1, Column: 5},
-		{Type: PLUS, Value: "+", Line: 1, Column: 7},
-		{Type: MULT, Value: "*", Line: 1, Column: 9},
-		{Type: EOF, Value: "", Line: 1, Column: 10},
+		{Type: NUMBER, Value: "2", Line: 1, Column: 5},
+		{Type: EOF, Value: "", Line: 1, Column: 6},
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	_, err := parser.Parse()
 
-	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+	if err == nil {
+		t.Fatal("Expected error for too many operands, got nil")
 	}
 
-	root, ok := expr.(*BinaryOp)
+	parserErr, ok := err.(*ParserError)
 	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
+		t.Fatalf("Expected ParserError, got: %T", err)
 	}
 
-	if root.Operator != "*" {
-		t.Errorf("root.Operator = %q, want %q", root.Operator, "*")
-	}
-
-	// Left should be a number
-	leftNum, ok := root.Left.(*Number)
-	if !ok {
-		t.Fatalf("root.Left type = %T, want *Number", root.Left)
-	}
-	if leftNum.Value != "2" {
-		t.Errorf("leftNum.Value = %q, want %q", leftNum.Value, "2")
-	}
-
-	// Right should be a BinaryOp
-	rightOp, ok := root.Right.(*BinaryOp)
-	if !ok {
-		t.Fatalf("root.Right type = %T, want *BinaryOp", root.Right)
-	}
-	if rightOp.Operator != "+" {
-		t.Errorf("rightOp.Operator = %q, want %q", rightOp.Operator, "+")
+	if parserErr.Message == "" {
+		t.Error("Expected error message to be non-empty")
 	}
 }
 
-// TestParserBothSidesParens tests "1 2 + 3 4 + *" which creates:
-// BinaryOp(*, BinaryOp(+, 1, 2), BinaryOp(+, 3, 4))
-func TestParserBothSidesParens(t *testing.T) {
+// TestParserEmptyExpression tests error for empty input.
+func TestParserEmptyExpression(t *testing.T) {
+	tokens := []Token{
+		{Type: EOF, Value: "", Line: 1, Column: 1},
+	}
+
+	parser := NewParser(tokens)
+	_, err := parser.Parse()
+
+	if err == nil {
+		t.Fatal("Expected error for empty expression, got nil")
+	}
+
+	parserErr, ok := err.(*ParserError)
+	if !ok {
+		t.Fatalf("Expected ParserError, got: %T", err)
+	}
+
+	if parserErr.Message == "" {
+		t.Error("Expected error message to be non-empty")
+	}
+}
+
+// TestParserFloatingPointNumbers tests parsing floating-point numbers.
+func TestParserFloatingPointNumbers(t *testing.T) {
+	tokens := []Token{
+		{Type: NUMBER, Value: "3.14", Line: 1, Column: 1},
+		{Type: NUMBER, Value: "2", Line: 1, Column: 6},
+		{Type: MULT, Value: "*", Line: 1, Column: 8},
+		{Type: EOF, Value: "", Line: 1, Column: 9},
+	}
+
+	parser := NewParser(tokens)
+	result, err := parser.Parse()
+
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	binOp, ok := result.(*BinaryOp)
+	if !ok {
+		t.Fatalf("Expected BinaryOp node, got: %T", result)
+	}
+
+	left, ok := binOp.Left.(*Number)
+	if !ok || left.Value != "3.14" {
+		t.Errorf("Expected left operand to be '3.14', got: %v", binOp.Left)
+	}
+
+	right, ok := binOp.Right.(*Number)
+	if !ok || right.Value != "2" {
+		t.Errorf("Expected right operand to be '2', got: %v", binOp.Right)
+	}
+}
+
+// TestParserErrorContainsTokenInfo tests that parser errors include token information.
+func TestParserErrorContainsTokenInfo(t *testing.T) {
+	tokens := []Token{
+		{Type: NUMBER, Value: "5", Line: 2, Column: 5},
+		{Type: PLUS, Value: "+", Line: 2, Column: 7},
+		{Type: EOF, Value: "", Line: 2, Column: 8},
+	}
+
+	parser := NewParser(tokens)
+	_, err := parser.Parse()
+
+	if err == nil {
+		t.Fatal("Expected error, got nil")
+	}
+
+	parserErr, ok := err.(*ParserError)
+	if !ok {
+		t.Fatalf("Expected ParserError, got: %T", err)
+	}
+
+	if parserErr.Token.Line != 2 {
+		t.Errorf("Expected error token line 2, got: %d", parserErr.Token.Line)
+	}
+
+	if parserErr.Token.Column != 7 {
+		t.Errorf("Expected error token column 7, got: %d", parserErr.Token.Column)
+	}
+}
+
+// TestParserComplexExpression tests a complex nested expression.
+func TestParserComplexExpression(t *testing.T) {
+	// Test: 1 2 + 3 4 + * => (1 + 2) * (3 + 4)
 	tokens := []Token{
 		{Type: NUMBER, Value: "1", Line: 1, Column: 1},
 		{Type: NUMBER, Value: "2", Line: 1, Column: 3},
@@ -472,80 +414,30 @@ func TestParserBothSidesParens(t *testing.T) {
 	}
 
 	parser := NewParser(tokens)
-	expr, err := parser.Parse()
+	result, err := parser.Parse()
 
 	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
+		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	root, ok := expr.(*BinaryOp)
+	// Root should be multiplication
+	root, ok := result.(*BinaryOp)
 	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
+		t.Fatalf("Expected root to be BinaryOp, got: %T", result)
 	}
 
 	if root.Operator != "*" {
-		t.Errorf("root.Operator = %q, want %q", root.Operator, "*")
+		t.Errorf("Expected root operator '*', got: '%s'", root.Operator)
 	}
 
-	// Both left and right should be BinaryOp
+	// Both children should be BinaryOps (additions)
 	leftOp, ok := root.Left.(*BinaryOp)
-	if !ok {
-		t.Fatalf("root.Left type = %T, want *BinaryOp", root.Left)
-	}
-	if leftOp.Operator != "+" {
-		t.Errorf("leftOp.Operator = %q, want %q", leftOp.Operator, "+")
+	if !ok || leftOp.Operator != "+" {
+		t.Errorf("Expected left child to be addition BinaryOp")
 	}
 
 	rightOp, ok := root.Right.(*BinaryOp)
-	if !ok {
-		t.Fatalf("root.Right type = %T, want *BinaryOp", root.Right)
-	}
-	if rightOp.Operator != "+" {
-		t.Errorf("rightOp.Operator = %q, want %q", rightOp.Operator, "+")
-	}
-}
-
-// TestParserPositionTracking tests that position information is preserved.
-func TestParserPositionTracking(t *testing.T) {
-	tokens := []Token{
-		{Type: NUMBER, Value: "5", Line: 1, Column: 1},
-		{Type: NUMBER, Value: "3", Line: 1, Column: 3},
-		{Type: PLUS, Value: "+", Line: 1, Column: 5},
-		{Type: EOF, Value: "", Line: 1, Column: 6},
-	}
-
-	parser := NewParser(tokens)
-	expr, err := parser.Parse()
-
-	if err != nil {
-		t.Fatalf("Parse() error = %v, want nil", err)
-	}
-
-	binOp, ok := expr.(*BinaryOp)
-	if !ok {
-		t.Fatalf("expr type = %T, want *BinaryOp", expr)
-	}
-
-	// Check operator position
-	if binOp.Line != 1 || binOp.Column != 5 {
-		t.Errorf("binOp position = (%d, %d), want (1, 5)", binOp.Line, binOp.Column)
-	}
-
-	// Check left operand position
-	left, ok := binOp.Left.(*Number)
-	if !ok {
-		t.Fatalf("binOp.Left type = %T, want *Number", binOp.Left)
-	}
-	if left.Line != 1 || left.Column != 1 {
-		t.Errorf("left position = (%d, %d), want (1, 1)", left.Line, left.Column)
-	}
-
-	// Check right operand position
-	right, ok := binOp.Right.(*Number)
-	if !ok {
-		t.Fatalf("binOp.Right type = %T, want *Number", binOp.Right)
-	}
-	if right.Line != 1 || right.Column != 3 {
-		t.Errorf("right position = (%d, %d), want (1, 3)", right.Line, right.Column)
+	if !ok || rightOp.Operator != "+" {
+		t.Errorf("Expected right child to be addition BinaryOp")
 	}
 }

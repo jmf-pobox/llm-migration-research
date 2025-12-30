@@ -1321,9 +1321,7 @@ class KaTeXGenerator:
 
         return self._wrap_infer_html(premises_html, conclusion_html, final_rule)
 
-    def _generate_premises_html(
-        self, children: list[ProofNode | CaseAnalysis]
-    ) -> str:
+    def _generate_premises_html(self, children: list[ProofNode | CaseAnalysis]) -> str:
         """Generate HTML for premises (children of an inference node)."""
         # Group children: siblings go together horizontally, sequential stack
         premise_groups: list[list[str]] = []
@@ -1365,9 +1363,7 @@ class KaTeXGenerator:
 
         return "".join(all_premises)
 
-    def _wrap_infer_html(
-        self, premises: str, conclusion: str, rule: str | None
-    ) -> str:
+    def _wrap_infer_html(self, premises: str, conclusion: str, rule: str | None) -> str:
         """Wrap premises and conclusion in an inference rule structure.
 
         Structure:
@@ -1396,15 +1392,11 @@ class KaTeXGenerator:
 
         return "".join(parts)
 
-    def _format_boxed_assumption_html(
-        self, expr: Expr, label: int | None
-    ) -> str:
+    def _format_boxed_assumption_html(self, expr: Expr, label: int | None) -> str:
         """Format an assumption as boxed with corner brackets: ⌜expr⌝^[label]."""
         expr_math = self.generate_expr(expr)
         label_html = f'<span class="assumption-label">[{label}]</span>' if label else ""
-        return (
-            f'<span class="boxed-assumption">${expr_math}$</span>{label_html}'
-        )
+        return f'<span class="boxed-assumption">${expr_math}$</span>{label_html}'
 
     def _format_boxed_ref_html(self, expr: Expr, ref_label: str) -> str:
         """Format a reference to an assumption: ⌜expr⌝^[label]."""

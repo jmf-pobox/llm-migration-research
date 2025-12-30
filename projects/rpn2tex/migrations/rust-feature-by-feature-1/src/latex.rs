@@ -1,410 +1,577 @@
-//! LaTeX generator for rpn2tex - converts AST to LaTeX.
+//! LaTeX code generator.
 //!
-//! This module converts the AST into LaTeX math mode output.
+//! This module converts AST nodes into LaTeX mathematical notation.
 
-use crate::ast::{BinaryOp, Expr, Number};
+use crate::{BinaryOp, Expr, Number};
 
-/// Converts rpn2tex AST to LaTeX source code.
+/// A LaTeX code generator for RPN expressions.
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::lexer::Lexer;
-/// use rpn2tex::parser::Parser;
-/// use rpn2tex::latex::LaTeXGenerator;
+/// use rpn2tex::{LaTeXGenerator, Lexer, Parser};
 ///
-/// let mut lexer = Lexer::new("5");
+/// let lexer = Lexer::new("5");
 /// let tokens = lexer.tokenize().unwrap();
-/// let ast = Parser::new(tokens).parse().unwrap();
-/// let latex = LaTeXGenerator::new().generate(&ast);
+/// let parser = Parser::new(tokens);
+/// let ast = parser.parse().unwrap();
+///
+/// let generator = LaTeXGenerator::new();
+/// let latex = generator.generate(&ast);
 /// assert_eq!(latex, "$5$");
 /// ```
 #[derive(Debug, Default)]
+#[must_use]
 pub struct LaTeXGenerator;
 
 impl LaTeXGenerator {
-    /// Create a new LaTeX generator.
+    /// Creates a new LaTeX generator.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::latex::LaTeXGenerator;
+    /// use rpn2tex::LaTeXGenerator;
     ///
     /// let generator = LaTeXGenerator::new();
     /// ```
-    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Generate LaTeX from AST.
+    /// Generates LaTeX code for the given AST.
+    ///
+    /// The output is wrapped in dollar signs ($...$) for inline math mode.
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::ast::{Expr, Number};
-    /// use rpn2tex::latex::LaTeXGenerator;
+    /// use rpn2tex::{LaTeXGenerator, Number, Expr};
     ///
-    /// let ast = Expr::Number(Number::new("42".to_string(), 1, 1));
-    /// let latex = LaTeXGenerator::new().generate(&ast);
+    /// let num = Number::new("42", 1, 1);
+    /// let expr = Expr::Number(num);
+    ///
+    /// let generator = LaTeXGenerator::new();
+    /// let latex = generator.generate(&expr);
     /// assert_eq!(latex, "$42$");
     /// ```
     #[must_use]
-    pub fn generate(&self, ast: &Expr) -> String {
-        let content = self.visit(ast);
-        format!("${content}$")
+    pub fn generate(&self, expr: &Expr) -> String {
+        let inner = self.visit(expr);
+        format!("${}$", inner)
     }
 
-    fn visit(&self, node: &Expr) -> String {
-        match node {
-            Expr::Number(n) => self.visit_number(n),
-            Expr::BinaryOp(op) => self.visit_binary_op(op),
+    fn visit(&self, expr: &Expr) -> String {
+        match expr {
+            Expr::Number(num) => self.visit_number(num),
+            Expr::BinaryOp(binop) => self.visit_binary_op(binop),
         }
     }
 
     fn visit_number(&self, node: &Number) -> String {
-        node.value.clone()
+        node.value().to_string()
     }
 
     fn visit_binary_op(&self, node: &BinaryOp) -> String {
-        let op_latex = Self::operator_to_latex(&node.operator);
-        let my_precedence = Self::precedence(&node.operator);
+        // Map operator to LaTeX representation
+        let op_latex = match node.operator() {
+            "+" => "+",
+            "-" => "-",
+            "*" => r"\times",
+            "/" => r"\div",
+            _ => node.operator(), // Fallback for future operators
+        };
+
+        let my_precedence = self.precedence(node.operator());
 
         // Generate left operand, adding parens if needed
-        let mut left = self.visit(&node.left);
-        if Self::needs_parens(&node.left, my_precedence, false) {
-            left = format!("( {left} )");
+        let mut left = self.visit(node.left());
+        if self.needs_parens(node.left(), my_precedence, false) {
+            left = format!("( {} )", left);
         }
 
         // Generate right operand, adding parens if needed
-        let mut right = self.visit(&node.right);
-        if Self::needs_parens(&node.right, my_precedence, true) {
-            right = format!("( {right} )");
+        let mut right = self.visit(node.right());
+        if self.needs_parens(node.right(), my_precedence, true) {
+            right = format!("( {} )", right);
         }
 
-        format!("{left} {op_latex} {right}")
+        format!("{} {} {}", left, op_latex, right)
     }
 
-    /// Get the precedence level for an operator.
+    /// Returns the precedence level for an operator.
     ///
-    /// Higher values indicate tighter binding.
-    /// Addition and subtraction have precedence 1.
-    /// Multiplication and division have precedence 2.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::latex::LaTeXGenerator;
-    ///
-    /// assert_eq!(LaTeXGenerator::precedence("+"), 1);
-    /// assert_eq!(LaTeXGenerator::precedence("-"), 1);
-    /// assert_eq!(LaTeXGenerator::precedence("*"), 2);
-    /// assert_eq!(LaTeXGenerator::precedence("/"), 2);
-    /// ```
-    #[must_use]
-    pub fn precedence(op: &str) -> u8 {
-        match op {
+    /// Higher numbers indicate tighter binding (evaluated first).
+    /// - Level 1: Addition, Subtraction
+    /// - Level 2: Multiplication, Division
+    fn precedence(&self, operator: &str) -> i32 {
+        match operator {
             "+" | "-" => 1,
             "*" | "/" => 2,
-            _ => 0,
+            _ => 0, // Unknown operators have lowest precedence
         }
     }
 
-    /// Determine if a child expression needs parentheses.
+    /// Determines if a child expression needs parentheses.
     ///
     /// Parentheses are needed when:
     /// 1. Child has lower precedence than parent
-    /// 2. Child has equal precedence, is on the right side, and is a
-    ///    non-commutative operator (- or /) to handle left-associativity
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::ast::{Expr, Number, BinaryOp};
-    /// use rpn2tex::latex::LaTeXGenerator;
-    ///
-    /// // Lower precedence needs parens: (5 + 3) * 2
-    /// let add = Expr::BinaryOp(BinaryOp::new(
-    ///     "+".to_string(),
-    ///     Expr::Number(Number::new("5".to_string(), 1, 1)),
-    ///     Expr::Number(Number::new("3".to_string(), 1, 3)),
-    ///     1, 5
-    /// ));
-    /// assert!(LaTeXGenerator::needs_parens(&add, 2, false));
-    ///
-    /// // Number never needs parens
-    /// let num = Expr::Number(Number::new("5".to_string(), 1, 1));
-    /// assert!(!LaTeXGenerator::needs_parens(&num, 2, false));
-    /// ```
-    #[must_use]
-    pub fn needs_parens(child: &Expr, parent_precedence: u8, is_right: bool) -> bool {
-        match child {
-            Expr::Number(_) => false,
-            Expr::BinaryOp(op) => {
-                let child_precedence = Self::precedence(&op.operator);
+    /// 2. Child has equal precedence, is on the right side,
+    ///    and is a non-commutative operator (- or /)
+    fn needs_parens(&self, child: &Expr, parent_precedence: i32, is_right: bool) -> bool {
+        // Only BinaryOp nodes can have precedence issues
+        let child_binop = match child {
+            Expr::BinaryOp(binop) => binop,
+            Expr::Number(_) => return false,
+        };
 
-                // Rule 1: Lower precedence always needs parens
-                if child_precedence < parent_precedence {
-                    return true;
-                }
+        let child_precedence = self.precedence(child_binop.operator());
 
-                // Rule 2: Equal precedence on right side needs parens
-                // for non-commutative operators (handles left-associativity)
-                child_precedence == parent_precedence
-                    && is_right
-                    && (op.operator == "-" || op.operator == "/")
-            }
+        // Lower precedence always needs parens
+        if child_precedence < parent_precedence {
+            return true;
         }
-    }
 
-    /// Convert an operator string to its LaTeX representation.
-    ///
-    /// Maps operator symbols to their LaTeX equivalents:
-    /// - `"+"` → `"+"`
-    /// - `"-"` → `"-"`
-    /// - `"*"` → `"\\times"`
-    /// - `"/"` → `"\\div"`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::latex::LaTeXGenerator;
-    ///
-    /// assert_eq!(LaTeXGenerator::operator_to_latex("*"), "\\times");
-    /// assert_eq!(LaTeXGenerator::operator_to_latex("/"), "\\div");
-    /// assert_eq!(LaTeXGenerator::operator_to_latex("+"), "+");
-    /// ```
-    #[must_use]
-    pub fn operator_to_latex(op: &str) -> &str {
-        match op {
-            "+" => "+",
-            "-" => "-",
-            "*" => "\\times",
-            "/" => "\\div",
-            _ => op,
-        }
+        // Equal precedence on right side needs parens for non-commutative operators
+        child_precedence == parent_precedence
+            && is_right
+            && matches!(child_binop.operator(), "-" | "/")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Number;
+    use crate::{BinaryOp, Lexer, Parser};
 
     #[test]
-    fn test_integer() {
-        let ast = Expr::Number(Number::new("5".to_string(), 1, 1));
-        let latex = LaTeXGenerator::new().generate(&ast);
+    fn test_generate_single_digit() {
+        let lexer = Lexer::new("5");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
         assert_eq!(latex, "$5$");
     }
 
     #[test]
-    fn test_decimal() {
-        let ast = Expr::Number(Number::new("3.14".to_string(), 1, 1));
-        let latex = LaTeXGenerator::new().generate(&ast);
+    fn test_generate_decimal() {
+        let lexer = Lexer::new("3.14");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
         assert_eq!(latex, "$3.14$");
     }
 
     #[test]
-    fn test_addition() {
-        let left = Expr::Number(Number::new("5".to_string(), 1, 1));
-        let right = Expr::Number(Number::new("3".to_string(), 1, 3));
-        let ast = Expr::BinaryOp(BinaryOp::new("+".to_string(), left, right, 1, 5));
-        let latex = LaTeXGenerator::new().generate(&ast);
+    fn test_generate_negative() {
+        let lexer = Lexer::new("-5");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$-5$");
+    }
+
+    #[test]
+    fn test_generate_multi_digit() {
+        let lexer = Lexer::new("12345");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$12345$");
+    }
+
+    #[test]
+    fn test_generate_leading_zero() {
+        let lexer = Lexer::new("01");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$01$");
+    }
+
+    #[test]
+    fn test_generate_trailing_decimal() {
+        let lexer = Lexer::new("5.");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$5.$");
+    }
+
+    #[test]
+    fn test_generate_very_long_decimal() {
+        let lexer = Lexer::new("3.14159265358979");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$3.14159265358979$");
+    }
+
+    #[test]
+    fn test_direct_number_generation() {
+        let num = Number::new("42", 1, 1);
+        let expr = Expr::Number(num);
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&expr);
+        assert_eq!(latex, "$42$");
+    }
+
+    #[test]
+    fn test_generate_addition() {
+        let lexer = Lexer::new("5 3 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
         assert_eq!(latex, "$5 + 3$");
     }
 
     #[test]
-    fn test_chained_addition() {
-        // 1 2 + 3 + 4 + -> ((1 + 2) + 3) + 4
-        let n1 = Expr::Number(Number::new("1".to_string(), 1, 1));
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 3));
-        let add1 = Expr::BinaryOp(BinaryOp::new("+".to_string(), n1, n2, 1, 5));
+    fn test_generate_chained_addition() {
+        let lexer = Lexer::new("1 2 + 3 + 4 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 7));
-        let add2 = Expr::BinaryOp(BinaryOp::new("+".to_string(), add1, n3, 1, 9));
-
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 11));
-        let ast = Expr::BinaryOp(BinaryOp::new("+".to_string(), add2, n4, 1, 13));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
         assert_eq!(latex, "$1 + 2 + 3 + 4$");
     }
 
     #[test]
-    fn test_multiplication() {
-        let left = Expr::Number(Number::new("4".to_string(), 1, 1));
-        let right = Expr::Number(Number::new("7".to_string(), 1, 3));
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), left, right, 1, 5));
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$4 \\times 7$");
+    fn test_generate_addition_with_floats() {
+        let lexer = Lexer::new("1.5 0.5 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$1.5 + 0.5$");
     }
 
     #[test]
-    fn test_multiplication_with_addition() {
-        // 2 3 4 * + -> 2 + (3 * 4)
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 1));
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 3));
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 5));
-        let mult = Expr::BinaryOp(BinaryOp::new("*".to_string(), n3, n4, 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("+".to_string(), n2, mult, 1, 9));
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$2 + 3 \\times 4$");
+    fn test_direct_binop_generation() {
+        let left = Number::new("10", 1, 1);
+        let right = Number::new("20", 1, 4);
+        let binop = BinaryOp::new("+", Expr::Number(left), Expr::Number(right), 1, 7);
+        let expr = Expr::BinaryOp(binop);
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&expr);
+        assert_eq!(latex, "$10 + 20$");
     }
 
     #[test]
-    fn test_division() {
-        let left = Expr::Number(Number::new("10".to_string(), 1, 1));
-        let right = Expr::Number(Number::new("2".to_string(), 1, 3));
-        let ast = Expr::BinaryOp(BinaryOp::new("/".to_string(), left, right, 1, 5));
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$10 \\div 2$");
+    fn test_generate_subtraction() {
+        let lexer = Lexer::new("5 3 -");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$5 - 3$");
     }
 
     #[test]
-    fn test_chained_division() {
-        // 100 10 / 5 / 2 / -> ((100 / 10) / 5) / 2
-        let n100 = Expr::Number(Number::new("100".to_string(), 1, 1));
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 3));
-        let div1 = Expr::BinaryOp(BinaryOp::new("/".to_string(), n100, n10, 1, 5));
+    fn test_generate_chained_subtraction() {
+        let lexer = Lexer::new("5 3 - 2 -");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n5 = Expr::Number(Number::new("5".to_string(), 1, 7));
-        let div2 = Expr::BinaryOp(BinaryOp::new("/".to_string(), div1, n5, 1, 9));
-
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 11));
-        let ast = Expr::BinaryOp(BinaryOp::new("/".to_string(), div2, n2, 1, 13));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$100 \\div 10 \\div 5 \\div 2$");
-    }
-
-    // Precedence tests
-    #[test]
-    fn test_precedence_addition_in_multiplication_left() {
-        // 5 3 + 2 * -> (5 + 3) * 2
-        let n5 = Expr::Number(Number::new("5".to_string(), 1, 1));
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 3));
-        let add = Expr::BinaryOp(BinaryOp::new("+".to_string(), n5, n3, 1, 5));
-
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), add, n2, 1, 9));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$( 5 + 3 ) \\times 2$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$5 - 3 - 2$");
     }
 
     #[test]
-    fn test_precedence_addition_in_multiplication_right() {
-        // 2 3 4 + * -> 2 * (3 + 4)
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 1));
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 3));
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 5));
-        let add = Expr::BinaryOp(BinaryOp::new("+".to_string(), n3, n4, 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), n2, add, 1, 9));
+    fn test_generate_subtraction_with_floats() {
+        let lexer = Lexer::new("5.5 2.3 -");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$2 \\times ( 3 + 4 )$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$5.5 - 2.3$");
     }
 
     #[test]
-    fn test_precedence_both_additions_in_multiplication() {
-        // 1 2 + 3 4 + * -> (1 + 2) * (3 + 4)
-        let n1 = Expr::Number(Number::new("1".to_string(), 1, 1));
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 3));
-        let add1 = Expr::BinaryOp(BinaryOp::new("+".to_string(), n1, n2, 1, 5));
+    fn test_direct_subtraction_generation() {
+        let left = Number::new("10", 1, 1);
+        let right = Number::new("3", 1, 4);
+        let binop = BinaryOp::new("-", Expr::Number(left), Expr::Number(right), 1, 7);
+        let expr = Expr::BinaryOp(binop);
 
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 7));
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 9));
-        let add2 = Expr::BinaryOp(BinaryOp::new("+".to_string(), n3, n4, 1, 11));
-
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), add1, add2, 1, 13));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$( 1 + 2 ) \\times ( 3 + 4 )$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&expr);
+        assert_eq!(latex, "$10 - 3$");
     }
 
     #[test]
-    fn test_precedence_complex_with_division() {
-        // 10 2 / 3 + 4 * -> (10 / 2 + 3) * 4
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 1));
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 3));
-        let div = Expr::BinaryOp(BinaryOp::new("/".to_string(), n10, n2, 1, 5));
+    fn test_generate_multiplication() {
+        let lexer = Lexer::new("4 7 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 7));
-        let add = Expr::BinaryOp(BinaryOp::new("+".to_string(), div, n3, 1, 9));
-
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 11));
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), add, n4, 1, 13));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$( 10 \\div 2 + 3 ) \\times 4$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$4 \times 7$");
     }
 
     #[test]
-    fn test_precedence_alternative_addition_in_multiplication() {
-        // 2 3 + 4 * -> (2 + 3) * 4
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 1));
-        let n3 = Expr::Number(Number::new("3".to_string(), 1, 3));
-        let add = Expr::BinaryOp(BinaryOp::new("+".to_string(), n2, n3, 1, 5));
+    fn test_generate_multiplication_with_floats() {
+        let lexer = Lexer::new("3.14 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n4 = Expr::Number(Number::new("4".to_string(), 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("*".to_string(), add, n4, 1, 9));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$( 2 + 3 ) \\times 4$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$3.14 \times 2$");
     }
 
     #[test]
-    fn test_left_associativity_subtraction() {
-        // 10 5 - 2 - -> (10 - 5) - 2 = 10 - 5 - 2 (no parens on left)
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 1));
-        let n5 = Expr::Number(Number::new("5".to_string(), 1, 3));
-        let sub1 = Expr::BinaryOp(BinaryOp::new("-".to_string(), n10, n5, 1, 5));
+    fn test_generate_multiplication_with_addition() {
+        // "2 3 4 * +" should output "$2 + 3 \times 4$" (no parens yet)
+        let lexer = Lexer::new("2 3 4 * +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("-".to_string(), sub1, n2, 1, 9));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$10 - 5 - 2$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$2 + 3 \times 4$");
     }
 
     #[test]
-    fn test_right_associativity_subtraction_needs_parens() {
-        // 10 5 2 - - -> 10 - (5 - 2) (parens needed on right)
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 1));
-        let n5 = Expr::Number(Number::new("5".to_string(), 1, 3));
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 5));
-        let sub2 = Expr::BinaryOp(BinaryOp::new("-".to_string(), n5, n2, 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("-".to_string(), n10, sub2, 1, 9));
+    fn test_direct_multiplication_generation() {
+        let left = Number::new("5", 1, 1);
+        let right = Number::new("3", 1, 4);
+        let binop = BinaryOp::new("*", Expr::Number(left), Expr::Number(right), 1, 7);
+        let expr = Expr::BinaryOp(binop);
 
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$10 - ( 5 - 2 )$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&expr);
+        assert_eq!(latex, r"$5 \times 3$");
     }
 
     #[test]
-    fn test_left_associativity_division() {
-        // 100 10 / 2 / -> (100 / 10) / 2 = 100 / 10 / 2 (no parens on left)
-        let n100 = Expr::Number(Number::new("100".to_string(), 1, 1));
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 3));
-        let div1 = Expr::BinaryOp(BinaryOp::new("/".to_string(), n100, n10, 1, 5));
+    fn test_generate_division() {
+        let lexer = Lexer::new("10 2 /");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("/".to_string(), div1, n2, 1, 9));
-
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$100 \\div 10 \\div 2$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$10 \div 2$");
     }
 
     #[test]
-    fn test_right_associativity_division_needs_parens() {
-        // 100 10 2 / / -> 100 / (10 / 2) (parens needed on right)
-        let n100 = Expr::Number(Number::new("100".to_string(), 1, 1));
-        let n10 = Expr::Number(Number::new("10".to_string(), 1, 3));
-        let n2 = Expr::Number(Number::new("2".to_string(), 1, 5));
-        let div2 = Expr::BinaryOp(BinaryOp::new("/".to_string(), n10, n2, 1, 7));
-        let ast = Expr::BinaryOp(BinaryOp::new("/".to_string(), n100, div2, 1, 9));
+    fn test_generate_chained_division() {
+        let lexer = Lexer::new("100 10 / 5 / 2 /");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
 
-        let latex = LaTeXGenerator::new().generate(&ast);
-        assert_eq!(latex, "$100 \\div ( 10 \\div 2 )$");
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$100 \div 10 \div 5 \div 2$");
+    }
+
+    #[test]
+    fn test_generate_division_with_floats() {
+        let lexer = Lexer::new("1.5 0.5 /");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$1.5 \div 0.5$");
+    }
+
+    #[test]
+    fn test_generate_division_with_multiplication() {
+        // "10 2 / 5 *" should output "$10 \div 2 \times 5$" (no parens yet)
+        let lexer = Lexer::new("10 2 / 5 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$10 \div 2 \times 5$");
+    }
+
+    #[test]
+    fn test_direct_division_generation() {
+        let left = Number::new("20", 1, 1);
+        let right = Number::new("4", 1, 4);
+        let binop = BinaryOp::new("/", Expr::Number(left), Expr::Number(right), 1, 7);
+        let expr = Expr::BinaryOp(binop);
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&expr);
+        assert_eq!(latex, r"$20 \div 4$");
+    }
+
+    // Precedence Feature Tests
+
+    #[test]
+    fn test_precedence_addition_under_multiplication_left() {
+        // "5 3 + 2 *" should output "$( 5 + 3 ) \times 2$"
+        let lexer = Lexer::new("5 3 + 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$( 5 + 3 ) \times 2$");
+    }
+
+    #[test]
+    fn test_precedence_addition_under_multiplication_right() {
+        // "2 3 4 + *" should output "$2 \times ( 3 + 4 )$"
+        let lexer = Lexer::new("2 3 4 + *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$2 \times ( 3 + 4 )$");
+    }
+
+    #[test]
+    fn test_precedence_addition_under_multiplication_both() {
+        // "1 2 + 3 4 + *" should output "$( 1 + 2 ) \times ( 3 + 4 )$"
+        let lexer = Lexer::new("1 2 + 3 4 + *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$( 1 + 2 ) \times ( 3 + 4 )$");
+    }
+
+    #[test]
+    fn test_precedence_complex_nested() {
+        // "10 2 / 3 + 4 *" should output "$( 10 \div 2 + 3 ) \times 4$"
+        let lexer = Lexer::new("10 2 / 3 + 4 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$( 10 \div 2 + 3 ) \times 4$");
+    }
+
+    #[test]
+    fn test_precedence_multiplication_over_addition_left() {
+        // "5 3 * 2 +" should output "$5 \times 3 + 2$" (no parens)
+        let lexer = Lexer::new("5 3 * 2 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$5 \times 3 + 2$");
+    }
+
+    #[test]
+    fn test_precedence_chained_addition_no_parens() {
+        // "1 2 + 3 + 4 +" should output "$1 + 2 + 3 + 4$"
+        let lexer = Lexer::new("1 2 + 3 + 4 +");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$1 + 2 + 3 + 4$");
+    }
+
+    #[test]
+    fn test_precedence_subtraction_on_right() {
+        // "5 3 2 - -" should output "$5 - ( 3 - 2 )$"
+        let lexer = Lexer::new("5 3 2 - -");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, "$5 - ( 3 - 2 )$");
+    }
+
+    #[test]
+    fn test_precedence_subtraction_under_multiplication() {
+        // "5 3 - 2 *" should output "$( 5 - 3 ) \times 2$"
+        let lexer = Lexer::new("5 3 - 2 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$( 5 - 3 ) \times 2$");
+    }
+
+    #[test]
+    fn test_precedence_division_multiplication_same_level() {
+        // "10 2 / 5 *" should output "$10 \div 2 \times 5$" (no parens)
+        let lexer = Lexer::new("10 2 / 5 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$10 \div 2 \times 5$");
+    }
+
+    #[test]
+    fn test_precedence_case_2() {
+        // I/O contract test case 2: "2 3 + 4 *" → "$( 2 + 3 ) \times 4$"
+        let lexer = Lexer::new("2 3 + 4 *");
+        let tokens = lexer.tokenize().unwrap();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().unwrap();
+
+        let generator = LaTeXGenerator::new();
+        let latex = generator.generate(&ast);
+        assert_eq!(latex, r"$( 2 + 3 ) \times 4$");
     }
 }

@@ -1,110 +1,99 @@
-// Package rpn2tex provides LaTeX generation from AST nodes.
-package rpn2tex
+package main
 
-import "strings"
+import "fmt"
 
-// Operator precedence levels.
-const (
-	PrecedenceLow  = 1 // Addition and subtraction
-	PrecedenceHigh = 2 // Multiplication and division
-)
+// LaTeXGenerator converts AST expressions to LaTeX notation.
+type LaTeXGenerator struct{}
 
-// Precedence maps operators to their precedence levels.
-var Precedence = map[string]int{
-	"+": PrecedenceLow,
-	"-": PrecedenceLow,
-	"*": PrecedenceHigh,
-	"/": PrecedenceHigh,
-}
-
-// BinaryOps maps RPN operators to their LaTeX representations.
-var BinaryOps = map[string]string{
+// Operator to LaTeX symbol mapping.
+var binaryOps = map[string]string{
 	"+": "+",
 	"-": "-",
 	"*": `\times`,
 	"/": `\div`,
 }
 
-// LaTeXGenerator implements the Visitor interface to generate LaTeX from an AST.
-type LaTeXGenerator struct{}
+// Operator precedence levels.
+var precedence = map[string]int{
+	"+": 1,
+	"-": 1,
+	"*": 2,
+	"/": 2,
+}
 
 // NewLaTeXGenerator creates a new LaTeX generator.
 func NewLaTeXGenerator() *LaTeXGenerator {
 	return &LaTeXGenerator{}
 }
 
-// Generate converts an AST expression to a LaTeX math mode string.
-// The output is wrapped in $ delimiters: "$expression$"
+// Generate converts an AST expression to LaTeX format.
+// Returns the LaTeX string wrapped in inline math mode delimiters ($...$).
 func (g *LaTeXGenerator) Generate(ast Expr) string {
-	content := ast.Accept(g)
+	content := g.visit(ast)
 	return "$" + content + "$"
 }
 
-// VisitNumber processes a Number node and returns its string value.
-func (g *LaTeXGenerator) VisitNumber(n *Number) string {
-	return n.Value
+// visit dispatches to the appropriate visitor method based on node type.
+func (g *LaTeXGenerator) visit(node Expr) string {
+	switch n := node.(type) {
+	case *Number:
+		return g.visitNumber(n)
+	case *BinaryOp:
+		return g.visitBinaryOp(n)
+	default:
+		panic(fmt.Sprintf("No visitor for %T", node))
+	}
 }
 
-// VisitBinaryOp processes a BinaryOp node and returns the formatted LaTeX expression.
-// This method handles parenthesization based on operator precedence.
-func (g *LaTeXGenerator) VisitBinaryOp(b *BinaryOp) string {
-	parentPrecedence := Precedence[b.Operator]
-	latexOp := BinaryOps[b.Operator]
-
-	// Visit left operand
-	leftStr := b.Left.Accept(g)
-	if g.needsParens(b.Left, parentPrecedence, false) {
-		leftStr = "( " + leftStr + " )"
-	}
-
-	// Visit right operand
-	rightStr := b.Right.Accept(g)
-	if g.needsParens(b.Right, parentPrecedence, true) {
-		rightStr = "( " + rightStr + " )"
-	}
-
-	// Build the expression: "left op right"
-	var result strings.Builder
-	result.WriteString(leftStr)
-	result.WriteString(" ")
-	result.WriteString(latexOp)
-	result.WriteString(" ")
-	result.WriteString(rightStr)
-
-	return result.String()
+// visitNumber handles Number nodes.
+func (g *LaTeXGenerator) visitNumber(node *Number) string {
+	return node.Value
 }
 
-// needsParens determines if a child expression needs parentheses
-// based on operator precedence and associativity.
-//
-// Parentheses are needed when:
-// 1. Child has lower precedence than parent (always)
-// 2. Child has equal precedence, is on the right side, and uses a non-commutative operator (-, /)
-//
-// Parameters:
-//   - child: The child expression to check
-//   - parentPrecedence: The precedence level of the parent operator
-//   - isRight: Whether the child is the right operand of the parent
-//
-// Returns true if parentheses are needed, false otherwise.
+// visitBinaryOp handles BinaryOp nodes with precedence-aware parenthesization.
+func (g *LaTeXGenerator) visitBinaryOp(node *BinaryOp) string {
+	op := binaryOps[node.Operator]
+	parentPrec := precedence[node.Operator]
+
+	// Recursively visit children
+	left := g.visit(node.Left)
+	right := g.visit(node.Right)
+
+	// Add parentheses to left child if needed
+	if g.needsParens(node.Left, parentPrec, false) {
+		left = "( " + left + " )"
+	}
+
+	// Add parentheses to right child if needed
+	if g.needsParens(node.Right, parentPrec, true) {
+		right = "( " + right + " )"
+	}
+
+	return left + " " + op + " " + right
+}
+
+// needsParens determines if a child expression needs parentheses.
+// A child needs parentheses if:
+// - It's a BinaryOp with lower precedence than the parent
+// - It's a BinaryOp on the right side with equal precedence (for left-associative operators)
 func (g *LaTeXGenerator) needsParens(child Expr, parentPrecedence int, isRight bool) bool {
-	// Only BinaryOp nodes need parentheses; Number nodes never do
 	binOp, ok := child.(*BinaryOp)
 	if !ok {
+		// Numbers never need parentheses
 		return false
 	}
 
-	childPrecedence := Precedence[binOp.Operator]
+	childPrec := precedence[binOp.Operator]
 
-	// Lower precedence always needs parens
-	if childPrecedence < parentPrecedence {
+	// Child has lower precedence - always needs parens
+	if childPrec < parentPrecedence {
 		return true
 	}
 
-	// Equal precedence on right side needs parens for non-commutative operators
-	// This enforces left-associativity for subtraction and division
-	if childPrecedence == parentPrecedence && isRight {
-		return binOp.Operator == "-" || binOp.Operator == "/"
+	// Child has equal precedence on the right side
+	// For left-associative operators (all of them in RPN), this needs parens
+	if childPrec == parentPrecedence && isRight {
+		return true
 	}
 
 	return false

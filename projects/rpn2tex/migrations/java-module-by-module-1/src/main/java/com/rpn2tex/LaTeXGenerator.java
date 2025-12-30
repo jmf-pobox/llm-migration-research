@@ -43,7 +43,7 @@ public class LaTeXGenerator {
 
     private String visit(Expr node) {
         if (node instanceof Number) {
-            return ((Number) node).value;
+            return ((Number) node).value();
         } else if (node instanceof BinaryOp) {
             return visitBinaryOp((BinaryOp) node);
         }
@@ -51,16 +51,16 @@ public class LaTeXGenerator {
     }
 
     private String visitBinaryOp(BinaryOp node) {
-        String opLatex = BINARY_OPS.get(node.operator);
-        int myPrecedence = PRECEDENCE.get(node.operator);
+        String opLatex = BINARY_OPS.get(node.operator());
+        int myPrecedence = PRECEDENCE.get(node.operator());
 
-        String left = visit(node.left);
-        if (needsParens(node.left, myPrecedence, false)) {
+        String left = visit(node.left());
+        if (needsParens(node.left(), myPrecedence, false)) {
             left = "( " + left + " )";
         }
 
-        String right = visit(node.right);
-        if (needsParens(node.right, myPrecedence, true)) {
+        String right = visit(node.right());
+        if (needsParens(node.right(), myPrecedence, true)) {
             right = "( " + right + " )";
         }
 
@@ -73,13 +73,13 @@ public class LaTeXGenerator {
         }
 
         BinaryOp childOp = (BinaryOp) child;
-        int childPrecedence = PRECEDENCE.get(childOp.operator);
+        int childPrecedence = PRECEDENCE.get(childOp.operator());
 
         if (childPrecedence < parentPrecedence) {
             return true;
         }
 
         return childPrecedence == parentPrecedence && isRight &&
-               (childOp.operator.equals("-") || childOp.operator.equals("/"));
+               (childOp.operator().equals("-") || childOp.operator().equals("/"));
     }
 }

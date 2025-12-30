@@ -1,134 +1,110 @@
-//! Lexer for rpn2tex - converts text into tokens.
+//! Lexical analysis for RPN expressions.
 //!
-//! This module tokenizes RPN (Reverse Polish Notation) expressions.
-//! The lexer converts input text like "5 3 +" into a stream of tokens.
+//! This module provides the [`Lexer`] struct for tokenizing RPN mathematical expressions.
+//! It converts raw text input into a stream of tokens, handling numbers (integers and
+//! floating-point), operators, and whitespace while tracking position information for
+//! error reporting.
 //!
-//! Key features:
-//! - Character-by-character scanning
-//! - Position tracking (line, column)
-//! - Number parsing (integers and decimals, including negatives)
-//! - Operator recognition (+, -, *, /)
-//! - Error handling with position information
+//! # Examples
+//!
+//! ```
+//! use rpn2tex::Lexer;
+//!
+//! let lexer = Lexer::new("5 3 +");
+//! let tokens = lexer.tokenize().unwrap();
+//! assert_eq!(tokens.len(), 4); // Number, Number, Plus, Eof
+//! ```
 
-use std::error::Error;
-use std::fmt;
-
+use crate::error::Rpn2TexError;
 use crate::tokens::{Token, TokenType};
 
-/// Error type for lexer failures.
+/// A lexical analyzer for RPN expressions.
 ///
-/// Contains position information to help identify where the error occurred.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::lexer::LexerError;
-///
-/// let error = LexerError {
-///     message: "Unexpected character '^'".to_string(),
-///     line: 1,
-///     column: 5,
-/// };
-/// assert_eq!(error.line, 1);
-/// assert_eq!(error.column, 5);
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LexerError {
-    /// Description of the error
-    pub message: String,
-    /// Line number where error occurred (1-based)
-    pub line: u32,
-    /// Column number where error occurred (1-based)
-    pub column: u32,
-}
-
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Line {}, column {}: {}",
-            self.line, self.column, self.message
-        )
-    }
-}
-
-impl Error for LexerError {}
-
-/// Tokenizes RPN input text.
-///
-/// The lexer scans input character by character, producing tokens for:
-/// - Numbers (integers and decimals)
+/// The lexer scans input text character by character, producing a sequence of tokens.
+/// It tracks line and column positions for error reporting and handles:
+/// - Numbers (integers and floating-point)
 /// - Operators (+, -, *, /)
-/// - EOF marker
-///
-/// Whitespace is used as a delimiter and is otherwise ignored.
+/// - Whitespace (spaces, tabs, newlines)
 ///
 /// # Examples
 ///
 /// ```
-/// use rpn2tex::lexer::Lexer;
-/// use rpn2tex::tokens::TokenType;
+/// use rpn2tex::Lexer;
 ///
-/// let mut lexer = Lexer::new("5 3 +");
+/// let lexer = Lexer::new("3.14 2 *");
 /// let tokens = lexer.tokenize().unwrap();
-/// assert_eq!(tokens.len(), 4); // 5, 3, +, EOF
-/// assert_eq!(tokens[0].token_type(), TokenType::Number);
-/// assert_eq!(tokens[0].value(), "5");
-/// assert_eq!(tokens[2].token_type(), TokenType::Plus);
+/// assert_eq!(tokens.len(), 4); // Number, Number, Star, Eof
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexer {
-    text: String,
-    pos: usize,
-    line: u32,
-    column: u32,
+    /// The source text being tokenized
+    source: String,
+    /// Current position in the source (0-based byte index)
+    position: usize,
+    /// Current line number (1-based)
+    line: usize,
+    /// Current column number (1-based)
+    column: usize,
 }
 
 impl Lexer {
-    /// Creates a new lexer with the given input text.
+    /// Creates a new lexer for the given source text.
+    ///
+    /// # Arguments
+    ///
+    /// * `source` - The source text to tokenize
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::lexer::Lexer;
+    /// use rpn2tex::Lexer;
     ///
     /// let lexer = Lexer::new("5 3 +");
     /// ```
     #[must_use]
-    pub fn new(text: impl Into<String>) -> Self {
+    pub fn new(source: impl Into<String>) -> Self {
         Self {
-            text: text.into(),
-            pos: 0,
+            source: source.into(),
+            position: 0,
             line: 1,
             column: 1,
         }
     }
 
-    /// Tokenizes the entire input text.
+    /// Tokenizes the entire source text.
     ///
-    /// Returns a vector of tokens, always ending with an EOF token.
+    /// Scans the source and produces a vector of tokens, ending with an EOF token.
+    /// Returns an error if an invalid character is encountered.
     ///
     /// # Errors
     ///
-    /// Returns `LexerError` if an invalid character is encountered.
+    /// Returns a [`Rpn2TexError::LexerError`] if:
+    /// - An unexpected character is encountered
+    /// - A malformed number is detected
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::lexer::Lexer;
-    /// use rpn2tex::tokens::TokenType;
+    /// use rpn2tex::Lexer;
     ///
-    /// let mut lexer = Lexer::new("2 3 +");
+    /// let lexer = Lexer::new("5 3 +");
     /// let tokens = lexer.tokenize().unwrap();
-    /// assert_eq!(tokens[0].token_type(), TokenType::Number);
-    /// assert_eq!(tokens[0].value(), "2");
+    /// assert_eq!(tokens.len(), 4);
     /// ```
-    pub fn tokenize(&mut self) -> Result<Vec<Token>, LexerError> {
+    ///
+    /// ```
+    /// use rpn2tex::Lexer;
+    ///
+    /// let lexer = Lexer::new("2 3 ^");
+    /// let result = lexer.tokenize();
+    /// assert!(result.is_err());
+    /// ```
+    pub fn tokenize(mut self) -> Result<Vec<Token>, Rpn2TexError> {
         let mut tokens = Vec::new();
 
-        while !self.at_end() {
+        while !self.is_at_end() {
             self.skip_whitespace();
-            if self.at_end() {
+            if self.is_at_end() {
                 break;
             }
             tokens.push(self.scan_token()?);
@@ -141,23 +117,31 @@ impl Lexer {
             self.line,
             self.column,
         ));
+
         Ok(tokens)
     }
 
-    /// Checks if we've reached the end of input.
-    fn at_end(&self) -> bool {
-        self.pos >= self.text.len()
+    /// Checks if we've reached the end of the source.
+    fn is_at_end(&self) -> bool {
+        self.position >= self.source.len()
     }
 
-    /// Looks at the current character without consuming it.
+    /// Peeks at the current character without consuming it.
     fn peek(&self) -> Option<char> {
-        self.text.chars().nth(self.pos)
+        self.source[self.position..].chars().next()
     }
 
-    /// Consumes and returns the current character.
+    /// Peeks at the next character without consuming it.
+    fn peek_next(&self) -> Option<char> {
+        let mut chars = self.source[self.position..].chars();
+        chars.next();
+        chars.next()
+    }
+
+    /// Advances to the next character and returns it.
     fn advance(&mut self) -> Option<char> {
-        if let Some(ch) = self.text.chars().nth(self.pos) {
-            self.pos += 1;
+        if let Some(ch) = self.peek() {
+            self.position += ch.len_utf8();
             if ch == '\n' {
                 self.line += 1;
                 self.column = 1;
@@ -170,10 +154,10 @@ impl Lexer {
         }
     }
 
-    /// Skips over whitespace characters.
+    /// Skips whitespace characters (spaces, tabs, newlines, carriage returns).
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.peek() {
-            if ch.is_whitespace() {
+            if matches!(ch, ' ' | '\t' | '\n' | '\r') {
                 self.advance();
             } else {
                 break;
@@ -181,118 +165,120 @@ impl Lexer {
         }
     }
 
-    /// Scans and returns the next token.
-    ///
-    /// # Errors
-    ///
-    /// Returns `LexerError` if an invalid character is encountered.
-    fn scan_token(&mut self) -> Result<Token, LexerError> {
+    /// Scans a single token from the current position.
+    fn scan_token(&mut self) -> Result<Token, Rpn2TexError> {
         let start_line = self.line;
         let start_column = self.column;
 
-        let ch = self.peek().ok_or_else(|| LexerError {
-            message: "Unexpected end of input".to_string(),
-            line: self.line,
-            column: self.column,
+        let ch = self.peek().ok_or_else(|| {
+            Rpn2TexError::lexer_error("Unexpected end of input", self.line, self.column)
         })?;
 
-        // Single-character operators
         match ch {
             '+' => {
                 self.advance();
-                return Ok(Token::new(
+                Ok(Token::new(
                     TokenType::Plus,
                     "+".to_string(),
                     start_line,
                     start_column,
-                ));
+                ))
             }
             '-' => {
-                self.advance();
-                // Check if this is a negative number (digit follows immediately)
-                if let Some(next_ch) = self.peek() {
+                // Check if this is a negative number or a minus operator
+                if let Some(next_ch) = self.peek_next() {
                     if next_ch.is_ascii_digit() {
-                        // It's a negative number
-                        return Ok(self.scan_number("-".to_string(), start_line, start_column));
+                        // This is a negative number
+                        return self.scan_number(start_line, start_column);
                     }
                 }
-                return Ok(Token::new(
+                // This is a minus operator
+                self.advance();
+                Ok(Token::new(
                     TokenType::Minus,
                     "-".to_string(),
                     start_line,
                     start_column,
-                ));
+                ))
             }
             '*' => {
                 self.advance();
-                return Ok(Token::new(
-                    TokenType::Mult,
+                Ok(Token::new(
+                    TokenType::Star,
                     "*".to_string(),
                     start_line,
                     start_column,
-                ));
+                ))
             }
             '/' => {
                 self.advance();
-                return Ok(Token::new(
-                    TokenType::Div,
+                Ok(Token::new(
+                    TokenType::Slash,
                     "/".to_string(),
                     start_line,
                     start_column,
-                ));
+                ))
             }
-            _ => {}
+            '0'..='9' => self.scan_number(start_line, start_column),
+            _ => Err(Rpn2TexError::lexer_error(
+                format!("Unexpected character '{}'", ch),
+                start_line,
+                start_column,
+            )),
         }
-
-        // Numbers
-        if ch.is_ascii_digit() {
-            return Ok(self.scan_number(String::new(), start_line, start_column));
-        }
-
-        // Unknown character
-        Err(LexerError {
-            message: format!("Unexpected character '{ch}'"),
-            line: start_line,
-            column: start_column,
-        })
     }
 
-    /// Scans a numeric literal.
-    ///
-    /// # Arguments
-    ///
-    /// * `prefix` - Any prefix already consumed (e.g., "-" for negatives)
-    /// * `start_line` - Line where number started
-    /// * `start_column` - Column where number started
-    fn scan_number(&mut self, prefix: String, start_line: u32, start_column: u32) -> Token {
-        let mut value = prefix;
+    /// Scans a number (integer or floating-point) from the current position.
+    fn scan_number(
+        &mut self,
+        start_line: usize,
+        start_column: usize,
+    ) -> Result<Token, Rpn2TexError> {
+        let mut lexeme = String::new();
 
-        // Integer part
+        // Handle negative sign
+        if self.peek() == Some('-') {
+            lexeme.push('-');
+            self.advance();
+        }
+
+        // Scan integer part
         while let Some(ch) = self.peek() {
             if ch.is_ascii_digit() {
-                value.push(ch);
+                lexeme.push(ch);
                 self.advance();
             } else {
                 break;
             }
         }
 
-        // Decimal part (optional)
-        if let Some('.') = self.peek() {
-            value.push('.');
-            self.advance();
+        // Check for decimal point
+        if self.peek() == Some('.') {
+            // Look ahead to ensure there's a digit after the decimal point
+            if let Some(next_ch) = self.peek_next() {
+                if next_ch.is_ascii_digit() {
+                    lexeme.push('.');
+                    self.advance(); // consume '.'
 
-            while let Some(ch) = self.peek() {
-                if ch.is_ascii_digit() {
-                    value.push(ch);
-                    self.advance();
-                } else {
-                    break;
+                    // Scan decimal part
+                    while let Some(ch) = self.peek() {
+                        if ch.is_ascii_digit() {
+                            lexeme.push(ch);
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        Token::new(TokenType::Number, value, start_line, start_column)
+        Ok(Token::new(
+            TokenType::Number,
+            lexeme,
+            start_line,
+            start_column,
+        ))
     }
 }
 
@@ -301,316 +287,193 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_basic_operators() {
-        let mut lexer = Lexer::new("+ - * /");
+    fn test_empty_input() {
+        let lexer = Lexer::new("");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 5); // 4 operators + EOF
-        assert_eq!(tokens[0].token_type(), TokenType::Plus);
-        assert_eq!(tokens[1].token_type(), TokenType::Minus);
-        assert_eq!(tokens[2].token_type(), TokenType::Mult);
-        assert_eq!(tokens[3].token_type(), TokenType::Div);
-        assert_eq!(tokens[4].token_type(), TokenType::Eof);
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].token_type, TokenType::Eof);
     }
 
     #[test]
-    fn test_numbers() {
-        let mut lexer = Lexer::new("5 3.14 1.5 0.5 100");
+    fn test_single_number() {
+        let lexer = Lexer::new("42");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 6); // 5 numbers + EOF
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].value(), "3.14");
-        assert_eq!(tokens[2].value(), "1.5");
-        assert_eq!(tokens[3].value(), "0.5");
-        assert_eq!(tokens[4].value(), "100");
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, TokenType::Number);
+        assert_eq!(tokens[0].lexeme, "42");
+        assert_eq!(tokens[1].token_type, TokenType::Eof);
     }
 
     #[test]
-    fn test_negative_numbers() {
-        let mut lexer = Lexer::new("-3 -2");
+    fn test_floating_point_number() {
+        let lexer = Lexer::new("3.14");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 3); // 2 numbers + EOF
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "-3");
-        assert_eq!(tokens[1].token_type(), TokenType::Number);
-        assert_eq!(tokens[1].value(), "-2");
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, TokenType::Number);
+        assert_eq!(tokens[0].lexeme, "3.14");
     }
 
     #[test]
-    fn test_rpn_expression() {
-        let mut lexer = Lexer::new("5 3 +");
+    fn test_negative_number() {
+        let lexer = Lexer::new("-5");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, TokenType::Number);
+        assert_eq!(tokens[0].lexeme, "-5");
+    }
+
+    #[test]
+    fn test_simple_expression() {
+        let lexer = Lexer::new("5 3 +");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].value(), "3");
-        assert_eq!(tokens[2].token_type(), TokenType::Plus);
-        assert_eq!(tokens[3].token_type(), TokenType::Eof);
+        assert_eq!(tokens[0].token_type, TokenType::Number);
+        assert_eq!(tokens[0].lexeme, "5");
+        assert_eq!(tokens[1].token_type, TokenType::Number);
+        assert_eq!(tokens[1].lexeme, "3");
+        assert_eq!(tokens[2].token_type, TokenType::Plus);
+        assert_eq!(tokens[2].lexeme, "+");
+        assert_eq!(tokens[3].token_type, TokenType::Eof);
+    }
+
+    #[test]
+    fn test_all_operators() {
+        let lexer = Lexer::new("+ - * /");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 5);
+        assert_eq!(tokens[0].token_type, TokenType::Plus);
+        assert_eq!(tokens[1].token_type, TokenType::Minus);
+        assert_eq!(tokens[2].token_type, TokenType::Star);
+        assert_eq!(tokens[3].token_type, TokenType::Slash);
+        assert_eq!(tokens[4].token_type, TokenType::Eof);
     }
 
     #[test]
     fn test_whitespace_handling() {
-        let mut lexer = Lexer::new("  5  \t 3  \n  +  ");
+        let lexer = Lexer::new("  5  \t3\n+  ");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].value(), "3");
-        assert_eq!(tokens[2].token_type(), TokenType::Plus);
+        assert_eq!(tokens[0].token_type, TokenType::Number);
+        assert_eq!(tokens[1].token_type, TokenType::Number);
+        assert_eq!(tokens[2].token_type, TokenType::Plus);
     }
 
     #[test]
     fn test_position_tracking() {
-        let mut lexer = Lexer::new("5 3");
+        let lexer = Lexer::new("5 3 +");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].line(), 1);
-        assert_eq!(tokens[0].column(), 1);
-        assert_eq!(tokens[1].line(), 1);
-        assert_eq!(tokens[1].column(), 3);
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[1].column, 3);
+        assert_eq!(tokens[2].line, 1);
+        assert_eq!(tokens[2].column, 5);
     }
 
     #[test]
-    fn test_multiline() {
-        let mut lexer = Lexer::new("5\n3\n+");
+    fn test_multiline_position_tracking() {
+        let lexer = Lexer::new("5\n3\n+");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].line(), 1);
-        assert_eq!(tokens[1].line(), 2);
-        assert_eq!(tokens[2].line(), 3);
+        assert_eq!(tokens[0].line, 1);
+        assert_eq!(tokens[0].column, 1);
+        assert_eq!(tokens[1].line, 2);
+        assert_eq!(tokens[1].column, 1);
+        assert_eq!(tokens[2].line, 3);
+        assert_eq!(tokens[2].column, 1);
     }
 
     #[test]
-    fn test_invalid_character() {
-        let mut lexer = Lexer::new("5 ^ 3");
+    fn test_unexpected_character() {
+        let lexer = Lexer::new("2 3 ^");
         let result = lexer.tokenize();
         assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.message.contains("Unexpected character '^'"));
-        assert_eq!(err.line, 1);
-        assert_eq!(err.column, 3);
+        if let Err(Rpn2TexError::LexerError {
+            message,
+            line,
+            column,
+        }) = result
+        {
+            assert!(message.contains("Unexpected character"));
+            assert!(message.contains("^"));
+            assert_eq!(line, 1);
+            assert_eq!(column, 5);
+        } else {
+            panic!("Expected LexerError");
+        }
     }
 
     #[test]
-    fn test_minus_as_operator() {
-        let mut lexer = Lexer::new("5 - 3");
+    fn test_complex_expression() {
+        let lexer = Lexer::new("3.14 2 * 5 +");
+        let tokens = lexer.tokenize().unwrap();
+        assert_eq!(tokens.len(), 6);
+        assert_eq!(tokens[0].lexeme, "3.14");
+        assert_eq!(tokens[1].lexeme, "2");
+        assert_eq!(tokens[2].token_type, TokenType::Star);
+        assert_eq!(tokens[3].lexeme, "5");
+        assert_eq!(tokens[4].token_type, TokenType::Plus);
+    }
+
+    #[test]
+    fn test_minus_operator_vs_negative_number() {
+        // "5 - 3" should tokenize as number, minus, number
+        let lexer = Lexer::new("5 - 3");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].token_type(), TokenType::Minus);
-        assert_eq!(tokens[2].value(), "3");
-    }
+        assert_eq!(tokens[0].lexeme, "5");
+        assert_eq!(tokens[1].token_type, TokenType::Minus);
+        assert_eq!(tokens[2].lexeme, "3");
 
-    #[test]
-    fn test_decimal_numbers() {
-        let mut lexer = Lexer::new("3.14 0.5");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].value(), "3.14");
-        assert_eq!(tokens[1].value(), "0.5");
-    }
-
-    #[test]
-    fn test_empty_input() {
-        let mut lexer = Lexer::new("");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens[0].token_type(), TokenType::Eof);
-    }
-
-    #[test]
-    fn test_lexer_error_display() {
-        let error = LexerError {
-            message: "Test error".to_string(),
-            line: 2,
-            column: 5,
-        };
-        let display = format!("{error}");
-        assert!(display.contains("Line 2"));
-        assert!(display.contains("column 5"));
-        assert!(display.contains("Test error"));
-    }
-}
-
-#[cfg(test)]
-mod io_contract_tests {
-    use super::*;
-
-    #[test]
-    fn test_io_contract_basic_operators() {
-        // Input: "+"
-        let mut lexer = Lexer::new("+");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 2, "Should have Plus and EOF");
-        assert_eq!(tokens[0].token_type(), TokenType::Plus);
-        assert_eq!(tokens[0].value(), "+");
-        assert_eq!(tokens[1].token_type(), TokenType::Eof);
-
-        // Input: "-"
-        let mut lexer = Lexer::new("-");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 2, "Should have Minus and EOF");
-        assert_eq!(tokens[0].token_type(), TokenType::Minus);
-        assert_eq!(tokens[0].value(), "-");
-
-        // Input: "*"
-        let mut lexer = Lexer::new("*");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 2, "Should have Mult and EOF");
-        assert_eq!(tokens[0].token_type(), TokenType::Mult);
-        assert_eq!(tokens[0].value(), "*");
-
-        // Input: "/"
-        let mut lexer = Lexer::new("/");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 2, "Should have Div and EOF");
-        assert_eq!(tokens[0].token_type(), TokenType::Div);
-        assert_eq!(tokens[0].value(), "/");
-    }
-
-    #[test]
-    fn test_io_contract_numbers() {
-        // Integer
-        let mut lexer = Lexer::new("5");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "5");
-
-        // Decimal
-        let mut lexer = Lexer::new("3.14");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "3.14");
-
-        // Negative integer
-        let mut lexer = Lexer::new("-2");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "-2");
-
-        // Negative decimal
-        let mut lexer = Lexer::new("-5.5");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "-5.5");
-    }
-
-    #[test]
-    fn test_io_contract_invalid_character() {
-        // Input: "^"
-        let mut lexer = Lexer::new("^");
-        let result = lexer.tokenize();
-        assert!(result.is_err(), "Should error on unexpected character");
-        let err = result.unwrap_err();
-        assert_eq!(err.message, "Unexpected character '^'");
-        // Position should be 1-based
-        assert_eq!(err.line, 1);
-        assert_eq!(err.column, 1);
-
-        // Input: "5 ^ 3" - error at position 3
-        let mut lexer = Lexer::new("5 ^ 3");
-        let result = lexer.tokenize();
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.message, "Unexpected character '^'");
-        assert_eq!(err.line, 1);
-        assert_eq!(err.column, 3);
-    }
-
-    #[test]
-    fn test_io_contract_position_tracking_1based() {
-        // First character should be at column 1
-        let mut lexer = Lexer::new("5");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].line(), 1);
-        assert_eq!(tokens[0].column(), 1, "First column should be 1-based");
-
-        // After space, column should be 3
-        let mut lexer = Lexer::new("5 3");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].column(), 1);
-        assert_eq!(
-            tokens[1].column(),
-            3,
-            "Second token after space should be at column 3"
-        );
-    }
-
-    #[test]
-    fn test_io_contract_negative_number_detection() {
-        // "-" followed by digit is negative number
-        let mut lexer = Lexer::new("-5 -3");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(
-            tokens[0].token_type(),
-            TokenType::Number,
-            "Should parse as number"
-        );
-        assert_eq!(tokens[0].value(), "-5");
-        assert_eq!(tokens[1].token_type(), TokenType::Number);
-        assert_eq!(tokens[1].value(), "-3");
-
-        // "-" NOT followed by digit is operator
-        let mut lexer = Lexer::new("5 - 3");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(
-            tokens[1].token_type(),
-            TokenType::Minus,
-            "Should parse as operator"
-        );
-        assert_eq!(tokens[1].value(), "-");
-    }
-
-    #[test]
-    fn test_io_contract_whitespace_handling() {
-        // Spaces should be skipped
-        let mut lexer = Lexer::new("  5  3  ");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 3); // 5, 3, EOF
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].value(), "3");
-        assert_eq!(tokens[2].token_type(), TokenType::Eof);
-
-        // Tabs should be skipped
-        let mut lexer = Lexer::new("5\t3");
+        // "5 -3" should tokenize as number, number (negative)
+        let lexer = Lexer::new("5 -3");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 3);
-
-        // Newlines should be skipped and tracked
-        let mut lexer = Lexer::new("5\n3");
-        let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens[0].line(), 1);
-        assert_eq!(tokens[1].line(), 2);
+        assert_eq!(tokens[0].lexeme, "5");
+        assert_eq!(tokens[1].lexeme, "-3");
     }
 
     #[test]
-    fn test_io_contract_eof_always_appended() {
-        // Even empty input has EOF
-        let mut lexer = Lexer::new("");
+    fn test_consecutive_numbers() {
+        let lexer = Lexer::new("10 20 30");
         let tokens = lexer.tokenize().unwrap();
-        assert_eq!(tokens.len(), 1);
-        assert_eq!(tokens[0].token_type(), TokenType::Eof);
-
-        // EOF always at end
-        let mut lexer = Lexer::new("5");
-        let tokens = lexer.tokenize().unwrap();
-        assert!(tokens.len() > 0);
-        assert_eq!(tokens[tokens.len() - 1].token_type(), TokenType::Eof);
+        assert_eq!(tokens.len(), 4);
+        assert_eq!(tokens[0].lexeme, "10");
+        assert_eq!(tokens[1].lexeme, "20");
+        assert_eq!(tokens[2].lexeme, "30");
     }
 
     #[test]
-    fn test_io_contract_complex_expression() {
-        // "5 3 +" - typical RPN
-        let mut lexer = Lexer::new("5 3 +");
+    fn test_io_contract_case_1() {
+        // "5 3 +" should produce tokens
+        let lexer = Lexer::new("5 3 +");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].token_type(), TokenType::Number);
-        assert_eq!(tokens[0].value(), "5");
-        assert_eq!(tokens[1].token_type(), TokenType::Number);
-        assert_eq!(tokens[1].value(), "3");
-        assert_eq!(tokens[2].token_type(), TokenType::Plus);
-        assert_eq!(tokens[3].token_type(), TokenType::Eof);
+        assert_eq!(tokens[0].lexeme, "5");
+        assert_eq!(tokens[1].lexeme, "3");
+        assert_eq!(tokens[2].token_type, TokenType::Plus);
+    }
 
-        // Negative numbers in expression
-        let mut lexer = Lexer::new("-5 -3 +");
+    #[test]
+    fn test_io_contract_case_5_error() {
+        // "2 3 ^" should produce error at line 1, column 5
+        let lexer = Lexer::new("2 3 ^");
+        let result = lexer.tokenize();
+        assert!(result.is_err());
+        if let Err(error) = result {
+            assert_eq!(error.line(), 1);
+            assert_eq!(error.column(), 5);
+            assert!(error.message().contains("^"));
+        }
+    }
+
+    #[test]
+    fn test_io_contract_case_18_float() {
+        // "3.14 2 *" should handle floating point
+        let lexer = Lexer::new("3.14 2 *");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(tokens.len(), 4);
-        assert_eq!(tokens[0].value(), "-5");
-        assert_eq!(tokens[1].value(), "-3");
-        assert_eq!(tokens[2].token_type(), TokenType::Plus);
+        assert_eq!(tokens[0].lexeme, "3.14");
+        assert_eq!(tokens[1].lexeme, "2");
+        assert_eq!(tokens[2].token_type, TokenType::Star);
     }
 }

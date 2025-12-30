@@ -1,20 +1,22 @@
-//! Stack-based RPN parser that converts tokens into an Abstract Syntax Tree.
+//! RPN Parser for converting token streams to Abstract Syntax Trees.
 //!
-//! This module implements a single-pass parser for Reverse Polish Notation (RPN)
-//! expressions. Unlike recursive descent parsers for infix notation, RPN parsing
-//! uses a simple stack-based algorithm:
+//! This module implements a stack-based parser for Reverse Polish Notation (RPN)
+//! expressions. The parser consumes a stream of tokens and constructs an Abstract
+//! Syntax Tree (AST) representing the mathematical expression.
 //!
-//! 1. When you see a number, push it onto the stack
-//! 2. When you see an operator, pop two operands, create a binary operation node, push result
-//! 3. At EOF, the stack should contain exactly one element: the AST root
+//! # RPN Parsing Algorithm
+//!
+//! The parser uses a stack-based algorithm:
+//! 1. Process tokens left to right
+//! 2. For numbers: push onto stack as Number nodes
+//! 3. For operators: pop two operands, create BinaryOp, push result
+//! 4. At the end: stack should contain exactly one node (the root)
 //!
 //! # Examples
 //!
 //! ```
-//! use rpn2tex::parser::Parser;
-//! use rpn2tex::tokens::{Token, TokenType};
+//! use rpn2tex::{Token, TokenType, Parser};
 //!
-//! // Parse "5 3 +"
 //! let tokens = vec![
 //!     Token::new(TokenType::Number, "5".to_string(), 1, 1),
 //!     Token::new(TokenType::Number, "3".to_string(), 1, 3),
@@ -22,274 +24,193 @@
 //!     Token::new(TokenType::Eof, "".to_string(), 1, 6),
 //! ];
 //!
-//! let mut parser = Parser::new(tokens);
-//! let ast = parser.parse().expect("valid RPN");
-//! ```
-//!
-//! # Stack Evolution Example
-//!
-//! For the input "5 3 + 2 *":
-//! ```text
-//! Token   Action              Stack
-//! -----   ------              -----
-//! 5       push Number(5)      [5]
-//! 3       push Number(3)      [5, 3]
-//! +       pop, create BinOp   [5+3]
-//! 2       push Number(2)      [5+3, 2]
-//! *       pop, create BinOp   [(5+3)*2]
-//! EOF     validate & return   Result: BinaryOp(*, BinaryOp(+, 5, 3), 2)
+//! let parser = Parser::new(tokens);
+//! let ast = parser.parse().expect("Failed to parse");
 //! ```
 
-use std::error::Error;
-use std::fmt;
-
-use crate::ast::Expr;
+use crate::ast::{AstNode, Operator};
+use crate::error::Rpn2TexError;
 use crate::tokens::{Token, TokenType};
 
-/// Error type for parser failures.
+/// Parser for converting token streams into Abstract Syntax Trees.
 ///
-/// Contains the error message and the token where the error occurred,
-/// providing context for error reporting.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::parser::ParserError;
-/// use rpn2tex::tokens::{Token, TokenType};
-///
-/// let token = Token::new(TokenType::Plus, "+".to_string(), 1, 5);
-/// let err = ParserError::new("Operator '+' requires two operands".to_string(), token);
-/// println!("{}", err); // Displays error with position information
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParserError {
-    /// The error message describing what went wrong.
-    pub message: String,
-    /// The token where the error occurred.
-    pub token: Token,
-}
-
-impl ParserError {
-    /// Creates a new `ParserError`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rpn2tex::parser::ParserError;
-    /// use rpn2tex::tokens::{Token, TokenType};
-    ///
-    /// let token = Token::new(TokenType::Plus, "+".to_string(), 1, 5);
-    /// let err = ParserError::new("Not enough operands".to_string(), token);
-    /// ```
-    #[must_use]
-    pub fn new(message: String, token: Token) -> Self {
-        Self { message, token }
-    }
-}
-
-impl fmt::Display for ParserError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} at line {}, column {}",
-            self.message,
-            self.token.line(),
-            self.token.column()
-        )
-    }
-}
-
-impl Error for ParserError {}
-
-/// Stack-based RPN parser.
-///
-/// Converts a token stream into an Abstract Syntax Tree using a stack
-/// to accumulate operands and build expression trees when operators are encountered.
-///
-/// # Examples
-///
-/// ```
-/// use rpn2tex::parser::Parser;
-/// use rpn2tex::tokens::{Token, TokenType};
-/// use rpn2tex::ast::Expr;
-///
-/// let tokens = vec![
-///     Token::new(TokenType::Number, "2".to_string(), 1, 1),
-///     Token::new(TokenType::Number, "3".to_string(), 1, 3),
-///     Token::new(TokenType::Plus, "+".to_string(), 1, 5),
-///     Token::new(TokenType::Eof, "".to_string(), 1, 6),
-/// ];
-///
-/// let mut parser = Parser::new(tokens);
-/// match parser.parse() {
-///     Ok(ast) => println!("Parsed successfully"),
-///     Err(e) => eprintln!("Parse error: {}", e),
-/// }
-/// ```
+/// The parser implements a stack-based RPN evaluation algorithm that constructs
+/// an AST by processing tokens from left to right.
+#[derive(Debug)]
 pub struct Parser {
+    /// The token stream to parse
     tokens: Vec<Token>,
-    current: usize,
+    /// Current position in the token stream
+    position: usize,
 }
 
 impl Parser {
-    /// Creates a new `Parser` with the given token list.
+    /// Creates a new parser with the given token stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `tokens` - A vector of tokens to parse (must end with EOF token)
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::parser::Parser;
-    /// use rpn2tex::tokens::{Token, TokenType};
+    /// use rpn2tex::{Token, TokenType, Parser};
     ///
     /// let tokens = vec![
     ///     Token::new(TokenType::Number, "42".to_string(), 1, 1),
     ///     Token::new(TokenType::Eof, "".to_string(), 1, 3),
     /// ];
-    ///
     /// let parser = Parser::new(tokens);
     /// ```
     #[must_use]
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens, current: 0 }
+        Self {
+            tokens,
+            position: 0,
+        }
     }
 
     /// Parses the token stream into an Abstract Syntax Tree.
     ///
-    /// Uses a stack-based algorithm to process RPN expressions:
-    /// - Numbers are pushed onto the stack
-    /// - Operators pop two operands, create a binary operation, and push the result
-    /// - At EOF, validates that exactly one expression remains on the stack
-    ///
-    /// # Returns
-    ///
-    /// The root expression node of the AST.
+    /// This is the main entry point for parsing. It processes all tokens using
+    /// a stack-based RPN algorithm and returns the root AST node.
     ///
     /// # Errors
     ///
-    /// Returns `ParserError` if:
-    /// - An operator doesn't have enough operands on the stack
+    /// Returns `Rpn2TexError::ParserError` if:
     /// - The expression is empty
-    /// - Multiple values remain on the stack (missing operators)
+    /// - An operator has insufficient operands
+    /// - Too many operands remain after parsing (missing operators)
     /// - An unexpected token is encountered
     ///
     /// # Examples
     ///
     /// ```
-    /// use rpn2tex::parser::Parser;
-    /// use rpn2tex::tokens::{Token, TokenType};
+    /// use rpn2tex::{Token, TokenType, Parser};
     ///
-    /// // Parse "2 3 + 4 *" → (2 + 3) * 4
+    /// // Parse "5 3 +"
     /// let tokens = vec![
-    ///     Token::new(TokenType::Number, "2".to_string(), 1, 1),
+    ///     Token::new(TokenType::Number, "5".to_string(), 1, 1),
     ///     Token::new(TokenType::Number, "3".to_string(), 1, 3),
     ///     Token::new(TokenType::Plus, "+".to_string(), 1, 5),
-    ///     Token::new(TokenType::Number, "4".to_string(), 1, 7),
-    ///     Token::new(TokenType::Mult, "*".to_string(), 1, 9),
-    ///     Token::new(TokenType::Eof, "".to_string(), 1, 10),
+    ///     Token::new(TokenType::Eof, "".to_string(), 1, 6),
     /// ];
     ///
-    /// let mut parser = Parser::new(tokens);
-    /// let ast = parser.parse().expect("valid RPN expression");
+    /// let parser = Parser::new(tokens);
+    /// let ast = parser.parse().expect("Parse should succeed");
     /// ```
-    #[allow(clippy::missing_panics_doc)] // Internal invariants prevent panics
-    pub fn parse(&mut self) -> Result<Expr, ParserError> {
-        let mut stack: Vec<Expr> = Vec::new();
+    pub fn parse(mut self) -> Result<AstNode, Rpn2TexError> {
+        let mut stack: Vec<AstNode> = Vec::new();
 
         while !self.at_end() {
-            let token = self.current_token();
+            let token = self.current();
 
-            match token.token_type() {
+            match token.token_type {
                 TokenType::Number => {
-                    // Push number onto stack
-                    let num_node = Expr::Number {
-                        line: token.line(),
-                        column: token.column(),
-                        value: token.value().to_string(),
-                    };
-                    stack.push(num_node);
+                    // Parse the number from the lexeme
+                    let value = token.lexeme.parse::<f64>().map_err(|_| {
+                        Rpn2TexError::parser_error(
+                            format!("Invalid number format: '{}'", token.lexeme),
+                            token.line,
+                            token.column,
+                        )
+                    })?;
+
+                    stack.push(AstNode::number(value));
                     self.advance();
                 }
 
-                TokenType::Plus | TokenType::Minus | TokenType::Mult | TokenType::Div => {
-                    // Pop two operands and create binary operation
+                TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash => {
+                    // Operators require two operands
                     if stack.len() < 2 {
-                        return Err(ParserError::new(
-                            format!("Operator '{}' requires two operands", token.value()),
-                            token.clone(),
+                        return Err(Rpn2TexError::parser_error(
+                            format!(
+                                "Operator '{}' requires two operands, but only {} available",
+                                token.lexeme,
+                                stack.len()
+                            ),
+                            token.line,
+                            token.column,
                         ));
                     }
 
-                    // Safe to unwrap: we just checked stack.len() >= 2
-                    let right = stack.pop().expect("stack has at least 2 elements");
-                    let left = stack.pop().expect("stack has at least 2 elements");
+                    // Pop right operand first, then left (RPN stack order)
+                    let right = stack.pop().unwrap(); // Safe: checked length above
+                    let left = stack.pop().unwrap(); // Safe: checked length above
 
-                    // Map token type to operator string
-                    let operator = match token.token_type() {
-                        TokenType::Plus => "+",
-                        TokenType::Minus => "-",
-                        TokenType::Mult => "*",
-                        TokenType::Div => "/",
-                        _ => unreachable!(),
-                    };
+                    // Map token type to operator
+                    let operator = self.token_to_operator(&token.token_type);
 
-                    let op_node = Expr::BinaryOp {
-                        line: token.line(),
-                        column: token.column(),
-                        operator: operator.to_string(),
-                        left: Box::new(left),
-                        right: Box::new(right),
-                    };
-                    stack.push(op_node);
+                    // Create binary operation node
+                    let binary_op = AstNode::binary_op(left, operator, right);
+                    stack.push(binary_op);
                     self.advance();
                 }
 
-                TokenType::Eof => break,
+                TokenType::Eof => {
+                    break;
+                }
+
+                _ => {
+                    return Err(Rpn2TexError::parser_error(
+                        format!("Unexpected token: '{}'", token.lexeme),
+                        token.line,
+                        token.column,
+                    ));
+                }
             }
         }
 
-        // Validate final state
+        // Validate final stack state
         if stack.is_empty() {
-            // Safe to unwrap: parser constructor requires non-empty token list with EOF
-            let eof_token = self.tokens.last().expect("token list must have EOF token");
-            return Err(ParserError::new(
-                "Empty expression".to_string(),
-                eof_token.clone(),
-            ));
+            return Err(Rpn2TexError::parser_error("Empty expression", 1, 1));
         }
 
         if stack.len() > 1 {
-            // Safe to unwrap: parser constructor requires non-empty token list with EOF
-            let eof_token = self.tokens.last().expect("token list must have EOF token");
-            return Err(ParserError::new(
+            // Get position of first remaining token for error reporting
+            // Create a default token to avoid borrow checker issues
+            let default_token = Token::new(TokenType::Eof, String::new(), 1, 1);
+            let first_token = self.tokens.first().unwrap_or(&default_token);
+            return Err(Rpn2TexError::parser_error(
                 format!(
-                    "Invalid RPN: {} values remain on stack (missing operators?)",
+                    "Invalid RPN expression: {} values remain on stack (missing operators?)",
                     stack.len()
                 ),
-                eof_token.clone(),
+                first_token.line,
+                first_token.column,
             ));
         }
 
-        // Safe to unwrap: we just checked stack has exactly 1 element
-        Ok(stack
-            .into_iter()
-            .next()
-            .expect("stack has exactly 1 element"))
+        // Return the root node
+        Ok(stack.pop().unwrap()) // Safe: checked that stack has exactly one element
+    }
+
+    /// Maps a token type to its corresponding operator.
+    fn token_to_operator(&self, token_type: &TokenType) -> Operator {
+        match token_type {
+            TokenType::Plus => Operator::Add,
+            TokenType::Minus => Operator::Subtract,
+            TokenType::Star => Operator::Multiply,
+            TokenType::Slash => Operator::Divide,
+            _ => unreachable!("token_to_operator called with non-operator token"),
+        }
     }
 
     /// Returns the current token without advancing.
-    fn current_token(&self) -> &Token {
-        &self.tokens[self.current]
-    }
-
-    /// Checks if we've reached the end of input (EOF token).
-    fn at_end(&self) -> bool {
-        matches!(self.tokens[self.current].token_type(), TokenType::Eof)
+    fn current(&self) -> &Token {
+        &self.tokens[self.position]
     }
 
     /// Advances to the next token.
     fn advance(&mut self) {
-        if !self.at_end() {
-            self.current += 1;
+        if self.position < self.tokens.len() {
+            self.position += 1;
         }
+    }
+
+    /// Checks if we've reached the end of the token stream.
+    fn at_end(&self) -> bool {
+        self.position >= self.tokens.len() || self.current().token_type == TokenType::Eof
     }
 }
 
@@ -298,105 +219,335 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple_addition() {
-        // "5 3 +"
+    fn test_parse_single_number() {
+        let tokens = vec![
+            Token::new(TokenType::Number, "42".to_string(), 1, 1),
+            Token::new(TokenType::Eof, "".to_string(), 1, 3),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        assert!(matches!(ast, AstNode::Number(x) if (x - 42.0).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_parse_floating_point() {
+        let tokens = vec![
+            Token::new(TokenType::Number, "3.14".to_string(), 1, 1),
+            Token::new(TokenType::Eof, "".to_string(), 1, 5),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        assert!(matches!(ast, AstNode::Number(x) if (x - 3.14).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_parse_negative_number() {
+        let tokens = vec![
+            Token::new(TokenType::Number, "-5".to_string(), 1, 1),
+            Token::new(TokenType::Eof, "".to_string(), 1, 3),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        assert!(matches!(ast, AstNode::Number(x) if (x + 5.0).abs() < 1e-10));
+    }
+
+    #[test]
+    fn test_parse_simple_addition() {
+        // 5 3 +
         let tokens = vec![
             Token::new(TokenType::Number, "5".to_string(), 1, 1),
             Token::new(TokenType::Number, "3".to_string(), 1, 3),
             Token::new(TokenType::Plus, "+".to_string(), 1, 5),
-            Token::new(TokenType::Eof, String::new(), 1, 6),
+            Token::new(TokenType::Eof, "".to_string(), 1, 6),
         ];
 
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
-
-        if let Expr::BinaryOp {
-            operator,
-            left,
-            right,
-            ..
-        } = expr
-        {
-            assert_eq!(operator, "+");
-            assert!(matches!(*left, Expr::Number { value, .. } if value == "5"));
-            assert!(matches!(*right, Expr::Number { value, .. } if value == "3"));
-        } else {
-            panic!("Expected BinaryOp");
+        match ast {
+            AstNode::BinaryOp {
+                left,
+                operator,
+                right,
+            } => {
+                assert_eq!(operator, Operator::Add);
+                assert!(matches!(*left, AstNode::Number(x) if (x - 5.0).abs() < 1e-10));
+                assert!(matches!(*right, AstNode::Number(x) if (x - 3.0).abs() < 1e-10));
+            }
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_nested_expression() {
-        // "5 3 + 2 *" → (5 + 3) * 2
+    fn test_parse_simple_subtraction() {
+        // 5 3 -
+        let tokens = vec![
+            Token::new(TokenType::Number, "5".to_string(), 1, 1),
+            Token::new(TokenType::Number, "3".to_string(), 1, 3),
+            Token::new(TokenType::Minus, "-".to_string(), 1, 5),
+            Token::new(TokenType::Eof, "".to_string(), 1, 6),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        match ast {
+            AstNode::BinaryOp { operator, .. } => {
+                assert_eq!(operator, Operator::Subtract);
+            }
+            _ => panic!("Expected BinaryOp node"),
+        }
+    }
+
+    #[test]
+    fn test_parse_simple_multiplication() {
+        // 4 7 *
+        let tokens = vec![
+            Token::new(TokenType::Number, "4".to_string(), 1, 1),
+            Token::new(TokenType::Number, "7".to_string(), 1, 3),
+            Token::new(TokenType::Star, "*".to_string(), 1, 5),
+            Token::new(TokenType::Eof, "".to_string(), 1, 6),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        match ast {
+            AstNode::BinaryOp { operator, .. } => {
+                assert_eq!(operator, Operator::Multiply);
+            }
+            _ => panic!("Expected BinaryOp node"),
+        }
+    }
+
+    #[test]
+    fn test_parse_simple_division() {
+        // 10 2 /
+        let tokens = vec![
+            Token::new(TokenType::Number, "10".to_string(), 1, 1),
+            Token::new(TokenType::Number, "2".to_string(), 1, 4),
+            Token::new(TokenType::Slash, "/".to_string(), 1, 6),
+            Token::new(TokenType::Eof, "".to_string(), 1, 7),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        match ast {
+            AstNode::BinaryOp { operator, .. } => {
+                assert_eq!(operator, Operator::Divide);
+            }
+            _ => panic!("Expected BinaryOp node"),
+        }
+    }
+
+    #[test]
+    fn test_parse_complex_expression() {
+        // 5 3 + 2 * => (5 + 3) * 2
         let tokens = vec![
             Token::new(TokenType::Number, "5".to_string(), 1, 1),
             Token::new(TokenType::Number, "3".to_string(), 1, 3),
             Token::new(TokenType::Plus, "+".to_string(), 1, 5),
             Token::new(TokenType::Number, "2".to_string(), 1, 7),
-            Token::new(TokenType::Mult, "*".to_string(), 1, 9),
-            Token::new(TokenType::Eof, String::new(), 1, 10),
+            Token::new(TokenType::Star, "*".to_string(), 1, 9),
+            Token::new(TokenType::Eof, "".to_string(), 1, 10),
         ];
 
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
+        // Root should be multiplication
+        match ast {
+            AstNode::BinaryOp {
+                left,
+                operator,
+                right,
+            } => {
+                assert_eq!(operator, Operator::Multiply);
 
-        if let Expr::BinaryOp {
-            operator,
-            left,
-            right,
-            ..
-        } = expr
-        {
-            assert_eq!(operator, "*");
-            assert!(matches!(*left, Expr::BinaryOp { operator, .. } if operator == "+"));
-            assert!(matches!(*right, Expr::Number { value, .. } if value == "2"));
-        } else {
-            panic!("Expected BinaryOp");
+                // Left should be addition (5 + 3)
+                match *left {
+                    AstNode::BinaryOp {
+                        operator: left_op, ..
+                    } => {
+                        assert_eq!(left_op, Operator::Add);
+                    }
+                    _ => panic!("Expected left to be BinaryOp"),
+                }
+
+                // Right should be number 2
+                assert!(matches!(*right, AstNode::Number(x) if (x - 2.0).abs() < 1e-10));
+            }
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_right_nested_expression() {
-        // "2 3 4 * +" → 2 + (3 * 4)
+    fn test_parse_multiple_operations() {
+        // 2 3 4 * + => 2 + (3 * 4)
         let tokens = vec![
             Token::new(TokenType::Number, "2".to_string(), 1, 1),
             Token::new(TokenType::Number, "3".to_string(), 1, 3),
             Token::new(TokenType::Number, "4".to_string(), 1, 5),
-            Token::new(TokenType::Mult, "*".to_string(), 1, 7),
+            Token::new(TokenType::Star, "*".to_string(), 1, 7),
             Token::new(TokenType::Plus, "+".to_string(), 1, 9),
-            Token::new(TokenType::Eof, String::new(), 1, 10),
+            Token::new(TokenType::Eof, "".to_string(), 1, 10),
         ];
 
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
+        // Root should be addition
+        match ast {
+            AstNode::BinaryOp {
+                left,
+                operator,
+                right,
+            } => {
+                assert_eq!(operator, Operator::Add);
 
-        if let Expr::BinaryOp {
-            operator,
-            left,
-            right,
-            ..
-        } = expr
-        {
-            assert_eq!(operator, "+");
-            assert!(matches!(*left, Expr::Number { value, .. } if value == "2"));
-            assert!(matches!(*right, Expr::BinaryOp { operator, .. } if operator == "*"));
-        } else {
-            panic!("Expected BinaryOp");
+                // Left should be number 2
+                assert!(matches!(*left, AstNode::Number(x) if (x - 2.0).abs() < 1e-10));
+
+                // Right should be multiplication (3 * 4)
+                match *right {
+                    AstNode::BinaryOp {
+                        operator: right_op, ..
+                    } => {
+                        assert_eq!(right_op, Operator::Multiply);
+                    }
+                    _ => panic!("Expected right to be BinaryOp"),
+                }
+            }
+            _ => panic!("Expected BinaryOp node"),
         }
     }
 
     #[test]
-    fn test_complex_nested() {
-        // "1 2 + 3 4 + *" → (1 + 2) * (3 + 4)
+    fn test_parse_error_empty_expression() {
+        let tokens = vec![Token::new(TokenType::Eof, "".to_string(), 1, 1)];
+
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { message, .. }) => {
+                assert!(message.contains("Empty expression"));
+            }
+            _ => panic!("Expected ParserError with empty expression message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_error_insufficient_operands() {
+        // 3 + (only one operand for binary operator)
+        let tokens = vec![
+            Token::new(TokenType::Number, "3".to_string(), 1, 1),
+            Token::new(TokenType::Plus, "+".to_string(), 1, 3),
+            Token::new(TokenType::Eof, "".to_string(), 1, 4),
+        ];
+
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError {
+                message,
+                line,
+                column,
+            }) => {
+                assert!(message.contains("requires two operands"));
+                assert_eq!(line, 1);
+                assert_eq!(column, 3);
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_parse_error_too_many_operands() {
+        // 5 3 2 (three operands, no operator)
+        let tokens = vec![
+            Token::new(TokenType::Number, "5".to_string(), 1, 1),
+            Token::new(TokenType::Number, "3".to_string(), 1, 3),
+            Token::new(TokenType::Number, "2".to_string(), 1, 5),
+            Token::new(TokenType::Eof, "".to_string(), 1, 6),
+        ];
+
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { message, .. }) => {
+                assert!(message.contains("3 values remain on stack"));
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_parse_error_invalid_number_format() {
+        let tokens = vec![
+            Token::new(TokenType::Number, "not_a_number".to_string(), 1, 1),
+            Token::new(TokenType::Eof, "".to_string(), 1, 13),
+        ];
+
+        let parser = Parser::new(tokens);
+        let result = parser.parse();
+
+        assert!(result.is_err());
+        match result {
+            Err(Rpn2TexError::ParserError { message, .. }) => {
+                assert!(message.contains("Invalid number format"));
+            }
+            _ => panic!("Expected ParserError"),
+        }
+    }
+
+    #[test]
+    fn test_parse_chained_operations() {
+        // 5 3 - 2 - => (5 - 3) - 2
+        let tokens = vec![
+            Token::new(TokenType::Number, "5".to_string(), 1, 1),
+            Token::new(TokenType::Number, "3".to_string(), 1, 3),
+            Token::new(TokenType::Minus, "-".to_string(), 1, 5),
+            Token::new(TokenType::Number, "2".to_string(), 1, 7),
+            Token::new(TokenType::Minus, "-".to_string(), 1, 9),
+            Token::new(TokenType::Eof, "".to_string(), 1, 10),
+        ];
+
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
+
+        // Verify the tree structure: outer subtraction
+        match ast {
+            AstNode::BinaryOp { left, operator, .. } => {
+                assert_eq!(operator, Operator::Subtract);
+                // Left child should also be subtraction
+                assert!(matches!(
+                    *left,
+                    AstNode::BinaryOp {
+                        operator: Operator::Subtract,
+                        ..
+                    }
+                ));
+            }
+            _ => panic!("Expected BinaryOp node"),
+        }
+    }
+
+    #[test]
+    fn test_parse_both_operands_expressions() {
+        // 1 2 + 3 4 + * => (1 + 2) * (3 + 4)
         let tokens = vec![
             Token::new(TokenType::Number, "1".to_string(), 1, 1),
             Token::new(TokenType::Number, "2".to_string(), 1, 3),
@@ -404,116 +555,39 @@ mod tests {
             Token::new(TokenType::Number, "3".to_string(), 1, 7),
             Token::new(TokenType::Number, "4".to_string(), 1, 9),
             Token::new(TokenType::Plus, "+".to_string(), 1, 11),
-            Token::new(TokenType::Mult, "*".to_string(), 1, 13),
-            Token::new(TokenType::Eof, String::new(), 1, 14),
+            Token::new(TokenType::Star, "*".to_string(), 1, 13),
+            Token::new(TokenType::Eof, "".to_string(), 1, 14),
         ];
 
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
+        let parser = Parser::new(tokens);
+        let ast = parser.parse().expect("Should parse successfully");
 
-        assert!(result.is_ok());
-        let expr = result.unwrap();
+        // Root should be multiplication
+        match ast {
+            AstNode::BinaryOp {
+                left,
+                operator,
+                right,
+            } => {
+                assert_eq!(operator, Operator::Multiply);
 
-        if let Expr::BinaryOp {
-            operator,
-            left,
-            right,
-            ..
-        } = expr
-        {
-            assert_eq!(operator, "*");
-            assert!(matches!(*left, Expr::BinaryOp { operator, .. } if operator == "+"));
-            assert!(matches!(*right, Expr::BinaryOp { operator, .. } if operator == "+"));
-        } else {
-            panic!("Expected BinaryOp");
-        }
-    }
-
-    #[test]
-    fn test_error_not_enough_operands() {
-        // "5 +" - missing second operand
-        let tokens = vec![
-            Token::new(TokenType::Number, "5".to_string(), 1, 1),
-            Token::new(TokenType::Plus, "+".to_string(), 1, 3),
-            Token::new(TokenType::Eof, String::new(), 1, 4),
-        ];
-
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.message.contains("requires two operands"));
-    }
-
-    #[test]
-    fn test_error_empty_expression() {
-        // Empty input
-        let tokens = vec![Token::new(TokenType::Eof, String::new(), 1, 1)];
-
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.message, "Empty expression");
-    }
-
-    #[test]
-    fn test_error_too_many_values() {
-        // "5 3" - missing operator
-        let tokens = vec![
-            Token::new(TokenType::Number, "5".to_string(), 1, 1),
-            Token::new(TokenType::Number, "3".to_string(), 1, 3),
-            Token::new(TokenType::Eof, String::new(), 1, 4),
-        ];
-
-        let mut parser = Parser::new(tokens);
-        let result = parser.parse();
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.message.contains("2 values remain on stack"));
-        assert!(err.message.contains("missing operators"));
-    }
-
-    #[test]
-    fn test_all_operators() {
-        // Test +, -, *, /
-        let operators = vec![
-            (TokenType::Plus, "+"),
-            (TokenType::Minus, "-"),
-            (TokenType::Mult, "*"),
-            (TokenType::Div, "/"),
-        ];
-
-        for (token_type, op_str) in operators {
-            let tokens = vec![
-                Token::new(TokenType::Number, "5".to_string(), 1, 1),
-                Token::new(TokenType::Number, "3".to_string(), 1, 3),
-                Token::new(token_type, op_str.to_string(), 1, 5),
-                Token::new(TokenType::Eof, String::new(), 1, 6),
-            ];
-
-            let mut parser = Parser::new(tokens);
-            let result = parser.parse();
-
-            assert!(result.is_ok());
-            if let Ok(Expr::BinaryOp { operator, .. }) = result {
-                assert_eq!(operator, op_str);
-            } else {
-                panic!("Expected BinaryOp for {}", op_str);
+                // Both children should be additions
+                assert!(matches!(
+                    *left,
+                    AstNode::BinaryOp {
+                        operator: Operator::Add,
+                        ..
+                    }
+                ));
+                assert!(matches!(
+                    *right,
+                    AstNode::BinaryOp {
+                        operator: Operator::Add,
+                        ..
+                    }
+                ));
             }
+            _ => panic!("Expected BinaryOp node"),
         }
-    }
-
-    #[test]
-    fn test_parser_error_display() {
-        let token = Token::new(TokenType::Plus, "+".to_string(), 2, 5);
-        let err = ParserError::new("Test error".to_string(), token);
-        let display = format!("{err}");
-        assert!(display.contains("Test error"));
-        assert!(display.contains("line 2"));
-        assert!(display.contains("column 5"));
     }
 }

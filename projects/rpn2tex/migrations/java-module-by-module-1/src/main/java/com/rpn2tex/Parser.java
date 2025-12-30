@@ -42,7 +42,7 @@ public class Parser {
             Token token = current();
 
             if (token.type == TokenType.NUMBER) {
-                stack.push(new Number(token.line, token.column, token.value));
+                stack.push(new Number(token.value, token.line, token.column));
                 advance();
 
             } else if (token.type == TokenType.PLUS || token.type == TokenType.MINUS ||
@@ -59,7 +59,7 @@ public class Parser {
                 Expr left = stack.pop();
                 String operator = tokenTypeToOperator(token.type);
 
-                stack.push(new BinaryOp(token.line, token.column, operator, left, right));
+                stack.push(new BinaryOp(operator, left, right, token.line, token.column));
                 advance();
 
             } else if (token.type == TokenType.EOF) {

@@ -1,87 +1,96 @@
-package rpn2tex
+package main
 
-import "fmt"
+// Precedence levels for operators
+var precedence = map[string]int{
+	"+": 1,
+	"-": 1,
+	"*": 2,
+	"/": 2,
+}
 
-// LaTeXGenerator generates LaTeX output from an AST.
+// Non-commutative operators that need special parenthesization on the right
+var nonCommutative = map[string]bool{
+	"-": true,
+	"/": true,
+}
+
+// LaTeX operator mapping
+var binaryOps = map[string]string{
+	"+": "+",
+	"-": "-",
+	"*": `\times`,
+	"/": `\div`,
+}
+
+// LaTeXGenerator generates LaTeX output from an AST
 type LaTeXGenerator struct{}
 
-// NewLaTeXGenerator creates a new LaTeX generator.
+// NewLaTeXGenerator creates a new LaTeX generator
 func NewLaTeXGenerator() *LaTeXGenerator {
 	return &LaTeXGenerator{}
 }
 
-// Generate generates LaTeX output from the given AST.
-func (g *LaTeXGenerator) Generate(expr Expr) (string, error) {
-	return g.visit(expr), nil
+// Generate generates LaTeX output for an expression
+func (g *LaTeXGenerator) Generate(expr Expr) string {
+	return "$" + g.visit(expr) + "$"
 }
 
-// visit dispatches to the appropriate visitor method based on node type.
+// visit visits an expression node and returns its LaTeX representation
 func (g *LaTeXGenerator) visit(expr Expr) string {
-	switch node := expr.(type) {
-	case *NumberNode:
-		return g.visitNumber(node)
-	case *BinaryOpNode:
-		return g.visitBinaryOp(node)
+	switch n := expr.(type) {
+	case *Number:
+		return g.visitNumber(n)
+	case *BinaryOp:
+		return g.visitBinaryOp(n)
 	default:
-		panic(fmt.Sprintf("unknown node type: %T", expr))
+		return ""
 	}
 }
 
-// visitNumber generates LaTeX for a number node.
-func (g *LaTeXGenerator) visitNumber(node *NumberNode) string {
-	return node.Value
+// visitNumber generates LaTeX for a number node
+func (g *LaTeXGenerator) visitNumber(n *Number) string {
+	return n.Value
 }
 
-// visitBinaryOp generates LaTeX for a binary operation node.
-func (g *LaTeXGenerator) visitBinaryOp(node *BinaryOpNode) string {
-	// Map operator to LaTeX representation
-	var opLatex string
-	switch node.Operator {
-	case "+":
-		opLatex = "+"
-	case "-":
-		opLatex = "-"
-	case "*":
-		opLatex = "\\times"
-	case "/":
-		opLatex = "\\div"
-	default:
-		opLatex = node.Operator
+// visitBinaryOp generates LaTeX for a binary operation with precedence handling
+func (g *LaTeXGenerator) visitBinaryOp(b *BinaryOp) string {
+	// Get operator's LaTeX representation and precedence
+	opLatex := binaryOps[b.Operator]
+	myPrecedence := precedence[b.Operator]
+
+	// Generate left operand, adding parens if needed
+	left := g.visit(b.Left)
+	if g.needsParens(b.Left, myPrecedence, false) {
+		left = "( " + left + " )"
 	}
 
-	// Recursively generate left operand, adding parentheses if needed
-	left := g.visit(node.Left)
-	if needsParentheses(node.Left, node, true) {
-		left = fmt.Sprintf("( %s )", left)
+	// Generate right operand, adding parens if needed
+	right := g.visit(b.Right)
+	if g.needsParens(b.Right, myPrecedence, true) {
+		right = "( " + right + " )"
 	}
 
-	// Recursively generate right operand, adding parentheses if needed
-	right := g.visit(node.Right)
-	if needsParentheses(node.Right, node, false) {
-		right = fmt.Sprintf("( %s )", right)
-	}
-
-	// Format as "left op right" with spaces
-	return fmt.Sprintf("%s %s %s", left, opLatex, right)
+	return left + " " + opLatex + " " + right
 }
 
-// needsParentheses determines if a child expression needs parentheses
-// when appearing as an operand of a parent binary operation.
-func needsParentheses(child Expr, parent *BinaryOpNode, isLeft bool) bool {
-	childPrec := child.Precedence()
-	parentPrec := parent.Precedence()
+// needsParens determines if a child expression needs parentheses
+func (g *LaTeXGenerator) needsParens(child Expr, parentPrecedence int, isRight bool) bool {
+	// Only BinaryOp nodes need parentheses consideration
+	binOp, ok := child.(*BinaryOp)
+	if !ok {
+		return false
+	}
 
-	// Rule 1: Lower precedence always needs parentheses
-	if childPrec < parentPrec {
+	childPrecedence := precedence[binOp.Operator]
+
+	// Lower precedence always needs parens
+	if childPrecedence < parentPrecedence {
 		return true
 	}
 
-	// Rule 2: Equal precedence on right side needs parentheses
-	// for non-commutative operators (- and /)
-	if childPrec == parentPrec && !isLeft {
-		if parent.Operator == "-" || parent.Operator == "/" {
-			return true
-		}
+	// Equal precedence on right side needs parens for non-commutative operators
+	if childPrecedence == parentPrecedence && isRight && nonCommutative[binOp.Operator] {
+		return true
 	}
 
 	return false
