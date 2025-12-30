@@ -69,6 +69,7 @@ class TestAnalyzePythonSource:
 class TestAnalyzeRustTarget:
     """Tests for analyze_rust_target method."""
 
+    @patch("migration.reporting.analyzer.PostHocAnalyzer._count_rust_loc_with_inline_tests")
     @patch("migration.reporting.analyzer.PostHocAnalyzer._run_cloc")
     @patch("migration.reporting.analyzer.PostHocAnalyzer._run_lizard")
     @patch("migration.reporting.analyzer.PostHocAnalyzer._count_cargo_deps")
@@ -77,9 +78,11 @@ class TestAnalyzeRustTarget:
         mock_deps: MagicMock,
         mock_lizard: MagicMock,
         mock_cloc: MagicMock,
+        mock_inline_tests: MagicMock,
     ) -> None:
         """Test analyzing Rust target code."""
-        mock_cloc.return_value = {"code": 600, "comment": 120, "blank": 60}
+        mock_inline_tests.return_value = (600, 200)  # (prod_loc, inline_test_loc)
+        mock_cloc.return_value = {"code": 100, "comment": 20, "blank": 10}  # tests/ dir
         mock_lizard.return_value = {"function_count": 35, "avg_cc": 2.5, "max_cc": 8}
         mock_deps.return_value = 3
 
@@ -90,6 +93,11 @@ class TestAnalyzeRustTarget:
             (src_dir / "main.rs").write_text("fn main() {}")
             (src_dir / "lib.rs").write_text("pub fn add() {}")
 
+            # Create tests directory
+            tests_dir = Path(tmpdir) / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "integration.rs").write_text("fn test() {}")
+
             # Create Cargo.toml
             (Path(tmpdir) / "Cargo.toml").write_text('[package]\nname = "test"')
 
@@ -97,6 +105,7 @@ class TestAnalyzeRustTarget:
             metrics = analyzer.analyze_rust_target(Path(tmpdir))
 
         assert metrics.production_loc == 600
+        assert metrics.test_loc == 300  # 200 inline + 100 from tests/
         assert metrics.function_count == 35
         assert metrics.module_count == 2
         assert metrics.external_dependencies == 3
@@ -108,6 +117,45 @@ class TestAnalyzeRustTarget:
             metrics = analyzer.analyze_rust_target(Path(tmpdir))
 
         assert metrics.production_loc == 0
+
+    def test_count_rust_loc_with_inline_tests(self) -> None:
+        """Test separating production code from inline #[cfg(test)] modules."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_dir = Path(tmpdir) / "src"
+            src_dir.mkdir()
+
+            # File with inline tests
+            (src_dir / "main.rs").write_text("""fn main() {
+    println!("Hello");
+}
+
+fn helper() -> i32 {
+    42
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_helper() {
+        assert_eq!(helper(), 42);
+    }
+}
+""")
+            # File without inline tests
+            (src_dir / "lib.rs").write_text("""pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+""")
+
+            analyzer = PostHocAnalyzer()
+            prod_loc, test_loc = analyzer._count_rust_loc_with_inline_tests(src_dir)
+
+            # main.rs: 6 prod lines (before #[cfg(test)]), 8 test lines
+            # lib.rs: 3 prod lines
+            assert prod_loc == 9  # 6 + 3
+            assert test_loc == 8
 
 
 class TestAnalyzeRustQuality:

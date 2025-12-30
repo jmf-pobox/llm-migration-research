@@ -17,6 +17,7 @@ from .schema import (
     CoverageResult,
     IdentityMetrics,
     IdiomaticnessResult,
+    IOContractMetrics,
     MigrationMetrics,
     ModuleTiming,
     OutcomeMetrics,
@@ -75,6 +76,7 @@ class MetricsCollector:
         self.quality_gates = QualityGates()
         self.source_metrics = CodeMetrics()
         self.target_metrics = CodeMetrics()
+        self.io_contract = IOContractMetrics()
 
         # Internal tracking
         self._phase_start_times: dict[str, float] = {}
@@ -165,6 +167,28 @@ class MetricsCollector:
         self.quality_gates.idiomaticness = IdiomaticnessResult(
             score=score,
             reasoning=reasoning,
+        )
+
+    def record_io_contract(
+        self,
+        total_test_cases: int,
+        passed: int,
+        failed: int = 0,
+        unsupported: int = 0,
+    ) -> None:
+        """Record I/O contract validation results.
+
+        Args:
+            total_test_cases: Total number of I/O test cases
+            passed: Number of test cases that passed
+            failed: Number of test cases that failed
+            unsupported: Number of test cases that were unsupported
+        """
+        self.io_contract = IOContractMetrics(
+            total_test_cases=total_test_cases,
+            passed=passed,
+            failed=failed,
+            unsupported=unsupported,
         )
 
     def record_source_loc(
@@ -301,6 +325,7 @@ class MetricsCollector:
             target_metrics=self.target_metrics,
             outcome=self.outcome,
             quality_gates=self.quality_gates,
+            io_contract=self.io_contract,
         )
 
 

@@ -90,7 +90,7 @@ python run_migration.py --target rust --project projects/rpn2tex --dry-run
 
 ## Telemetry & Reporting
 
-Every migration automatically captures metrics:
+Every migration automatically captures metrics and saves them to JSON files in the migration's `logs/` directory:
 
 | Category | Metrics |
 |----------|---------|
@@ -103,21 +103,40 @@ Every migration automatically captures metrics:
 | Coverage | Line, function, and branch coverage percentages |
 | I/O Contract | Test cases passed/failed, match rate |
 
-Query and export with the reporting CLI:
+### Storing Metrics in Database
+
+Metrics are **not** automatically inserted into `migrations.db`. After a migration completes, backfill the metrics from log files:
+
+```bash
+# Backfill a single migration
+PYTHONPATH=src python -m migration.reporting backfill \
+  projects/rpn2tex/migrations/rust-module-by-module-1/logs/*.log \
+  --project rpn2tex --strategy module-by-module
+
+# Backfill all migrations for a project
+for log in projects/rpn2tex/migrations/*/logs/*.log; do
+  PYTHONPATH=src python -m migration.reporting backfill "$log" \
+    --project rpn2tex --strategy module-by-module
+done
+```
+
+### Querying the Database
+
+Once metrics are backfilled, query and export with the reporting CLI:
 
 ```bash
 # View database statistics
-python -m reporting stats
+PYTHONPATH=src python -m migration.reporting stats
 
 # Query migrations
-python -m reporting query --project rpn2tex --target rust
+PYTHONPATH=src python -m migration.reporting query --project rpn2tex --target rust
 
 # Compare strategies
-python -m reporting compare <run_id_1> <run_id_2>
+PYTHONPATH=src python -m migration.reporting compare <run_id_1> <run_id_2>
 
 # Export summary
-python -m reporting export --format markdown
-python -m reporting export --format latex
+PYTHONPATH=src python -m migration.reporting export --format markdown
+PYTHONPATH=src python -m migration.reporting export --format latex
 ```
 
 See [docs/REPORTING.md](docs/REPORTING.md) for the full API.

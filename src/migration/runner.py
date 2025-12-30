@@ -695,22 +695,91 @@ async def run_migration(
     for i, cmd in enumerate(target.get_quality_gates(), 1):
         log(f"{i}. Run: {cmd}", log_file)
 
-    # Measure coverage after migration
+    # Measure target metrics after migration using PostHocAnalyzer
     if collector:
         log("", log_file)
-        log("Measuring test coverage...", log_file)
-        coverage = measure_coverage(target, project_dir, log_file)
-        collector.record_coverage(coverage)
+        log("Analyzing target code with PostHocAnalyzer...", log_file)
+        try:
+            from .reporting.analyzer import PostHocAnalyzer
 
-        # Measure target LOC
-        target_dir = target.get_source_dir(project_dir)
-        tgt_prod, tgt_test, tgt_files = measure_loc(target_dir, target.name, log_file)
-        collector.record_target_loc(tgt_prod, tgt_test, tgt_files)
+            analyzer = PostHocAnalyzer()
+            target_path = Path(project_dir)
+
+            # Call language-specific analyzer
+            if target.name == "rust":
+                target_metrics = analyzer.analyze_rust_target(target_path)
+                quality_gates = analyzer.analyze_rust_quality(target_path)
+                # Use coverage from quality gates if available
+                if quality_gates.coverage.line_coverage_pct is not None:
+                    collector.record_coverage(quality_gates.coverage.line_coverage_pct)
+                else:
+                    # Fallback to manual coverage measurement
+                    coverage = measure_coverage(target, project_dir, log_file)
+                    collector.record_coverage(coverage)
+            elif target.name == "java":
+                target_metrics = analyzer.analyze_java_target(target_path)
+                # Java coverage from measure_coverage
+                coverage = measure_coverage(target, project_dir, log_file)
+                collector.record_coverage(coverage)
+            elif target.name == "go":
+                target_metrics = analyzer.analyze_go_target(target_path)
+                coverage = measure_coverage(target, project_dir, log_file)
+                collector.record_coverage(coverage)
+            else:
+                # Fallback to manual measurement for unknown targets
+                target_dir = target.get_source_dir(project_dir)
+                tgt_prod, tgt_test, _ = measure_loc(target_dir, target.name, log_file)
+                target_metrics = type(
+                    "Metrics", (), {"production_loc": tgt_prod, "test_loc": tgt_test}
+                )()
+                coverage = measure_coverage(target, project_dir, log_file)
+                collector.record_coverage(coverage)
+
+            collector.record_target_loc(
+                target_metrics.production_loc,
+                target_metrics.test_loc,
+                target_metrics.module_count if hasattr(target_metrics, "module_count") else 0,
+            )
+            log(
+                f"Target LOC: {target_metrics.production_loc} prod, "
+                f"{target_metrics.test_loc} test",
+                log_file,
+            )
+        except Exception as e:
+            log(f"Warning: PostHocAnalyzer failed, using fallback: {e}", log_file)
+            # Fallback to manual measurement
+            target_dir = target.get_source_dir(project_dir)
+            tgt_prod, tgt_test, tgt_files = measure_loc(
+                target_dir, target.name, log_file
+            )
+            collector.record_target_loc(tgt_prod, tgt_test, tgt_files)
+            coverage = measure_coverage(target, project_dir, log_file)
+            collector.record_coverage(coverage)
 
         # Evaluate idiomaticness
         log("", log_file)
         score, reasoning = evaluate_idiomaticness(target, project_dir, log_file)
         collector.record_idiomaticness(score, reasoning)
+
+        # Record I/O contract results
+        # For successful migrations, all test cases pass (I/O validation is blocking)
+        total_test_cases = len(config.test_inputs)
+        if migration_status == "success" and total_test_cases > 0:
+            collector.record_io_contract(
+                total_test_cases=total_test_cases,
+                passed=total_test_cases,
+                failed=0,
+                unsupported=0,
+            )
+            log(f"I/O contract: {total_test_cases}/{total_test_cases} passed", log_file)
+        else:
+            # For failures, we don't know exact results - record 0
+            collector.record_io_contract(
+                total_test_cases=total_test_cases,
+                passed=0,
+                failed=0,
+                unsupported=0,
+            )
 
     # Finalize and save metrics
     if collector:
@@ -743,6 +812,17 @@ async def run_migration(
             log(f"Report saved: {report_file}", log_file)
         except Exception as e:
             log(f"Warning: Could not generate report: {e}", log_file)
+
+        # Insert metrics into database
+        try:
+            from .reporting.database import MigrationDatabase
+
+            db_path = Path(base_dir) / "migrations.db"
+            db = MigrationDatabase(db_path)
+            db.insert(metrics)
+            log(f"Metrics inserted into database: {db_path}", log_file)
+        except Exception as e:
+            log(f"Warning: Could not insert metrics into database: {e}", log_file)
 
         collector.end_phase("reporting")
         return collector

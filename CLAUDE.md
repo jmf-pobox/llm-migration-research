@@ -50,6 +50,7 @@ hatch run check-cov      # lint + type + test-cov (with coverage)
 - No `hasattr()` - use protocols instead
 - No defensive coding or fallback logic unless explicitly requested
 - No mock objects in production code (tests only)
+- **No one-off scripts**: Enhance core software instead of writing throwaway scripts in project root
 
 ## Workflow Commands
 
@@ -179,3 +180,29 @@ Each migration must pass:
 3. **Formatting**: Code style (rustfmt, google-java-format, gofmt)
 4. **Testing**: All unit tests pass
 5. **IO Contract**: Behavioral equivalence verified
+
+## LOC Counting Methodology
+
+### Tool: `cloc`
+
+Use `cloc --json` for all LOC counting. Use the `"code"` field which excludes blank lines and comments.
+
+### Language-Specific Rules
+
+**Rust**: Rust has inline test modules (`#[cfg(test)]`) in the same files as production code. These MUST be separated:
+- **Production LOC**: Lines BEFORE `#[cfg(test)]` marker in each file
+- **Test LOC**: Lines AFTER `#[cfg(test)]` marker PLUS any files in `tests/` directory
+
+**Java**: Standard directory structure:
+- **Production LOC**: `src/main/java/`
+- **Test LOC**: `src/test/java/`
+
+**Go**: File naming convention:
+- **Production LOC**: `*.go` files NOT ending in `_test.go`
+- **Test LOC**: `*_test.go` files
+
+### PostHocAnalyzer
+
+The `PostHocAnalyzer` class in `src/migration/reporting/analyzer.py` implements `cloc`-based LOC counting. Use `analyze_rust_target()`, `analyze_java_target()`, `analyze_go_target()`, or the appropriate method for each language.
+
+The Rust analyzer separates inline `#[cfg(test)]` code from production code by parsing each `.rs` file and splitting at the test marker.

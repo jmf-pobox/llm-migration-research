@@ -72,22 +72,20 @@ class PostHocAnalyzer:
         if not src_path.exists():
             return metrics
 
-        # Count LOC with cloc
-        loc_data = self._run_cloc(src_path, "Rust")
-        if loc_data:
-            metrics.production_loc = loc_data.get("code", 0)
-            metrics.total_loc = (
-                loc_data.get("code", 0)
-                + loc_data.get("comment", 0)
-                + loc_data.get("blank", 0)
-            )
+        # Count LOC separating production from inline #[cfg(test)] code
+        prod_loc, inline_test_loc = self._count_rust_loc_with_inline_tests(src_path)
+        metrics.production_loc = prod_loc
+        metrics.test_loc = inline_test_loc
 
-        # Check for tests directory
+        # Add tests/ directory LOC to test_loc
         tests_path = target_path / "tests"
         if tests_path.exists():
             test_loc = self._run_cloc(tests_path, "Rust")
             if test_loc:
-                metrics.test_loc = test_loc.get("code", 0)
+                metrics.test_loc += test_loc.get("code", 0)
+
+        # Calculate total_loc
+        metrics.total_loc = metrics.production_loc + metrics.test_loc
 
         # Analyze complexity with lizard
         complexity_data = self._run_lizard(src_path, "rust")
@@ -160,6 +158,65 @@ class PostHocAnalyzer:
 
         return metrics
 
+    def analyze_go_target(self, target_path: Path) -> CodeMetrics:
+        """Analyze Go target code complexity and size.
+
+        Go projects have production code in *.go files and test code in
+        *_test.go files, typically at the root of the module.
+        """
+        metrics = CodeMetrics()
+
+        # Go files are typically at root or in subdirectories
+        # First check for go.mod to find module root
+        go_files = list(target_path.glob("*.go"))
+        if not go_files:
+            # Check for cmd/ or pkg/ structure
+            go_files = list(target_path.glob("**/*.go"))
+
+        if not go_files:
+            return metrics
+
+        # Separate prod and test files
+        prod_files = [f for f in go_files if not f.name.endswith("_test.go")]
+        test_files = [f for f in go_files if f.name.endswith("_test.go")]
+
+        # Count LOC for production files
+        if prod_files:
+            loc_data = self._run_cloc_files(prod_files, "Go")
+            if loc_data:
+                metrics.production_loc = loc_data.get("code", 0)
+
+        # Count LOC for test files
+        if test_files:
+            test_loc = self._run_cloc_files(test_files, "Go")
+            if test_loc:
+                metrics.test_loc = test_loc.get("code", 0)
+
+        metrics.total_loc = metrics.production_loc + metrics.test_loc
+
+        # Analyze complexity with lizard (use target_path for all Go files)
+        complexity_data = self._run_lizard(target_path, "go")
+        if complexity_data:
+            metrics.function_count = complexity_data.get("function_count", 0)
+            metrics.avg_cyclomatic_complexity = complexity_data.get("avg_cc", 0.0)
+            metrics.max_cyclomatic_complexity = complexity_data.get("max_cc", 0)
+
+        # Count modules (non-test .go files)
+        metrics.module_count = len(prod_files)
+
+        # Count external dependencies from go.mod
+        go_mod = target_path / "go.mod"
+        if go_mod.exists():
+            metrics.external_dependencies = self._count_go_deps(go_mod)
+
+        # Calculate Maintainability Index from collected metrics
+        metrics.maintainability_index = self._calculate_mi_from_metrics(
+            metrics.production_loc,
+            metrics.avg_cyclomatic_complexity,
+        )
+
+        return metrics
+
     def analyze_rust_quality(self, target_path: Path) -> QualityGates:
         """Run Rust quality gates and return results."""
         quality = QualityGates()
@@ -197,6 +254,80 @@ class PostHocAnalyzer:
         except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
             pass
         return None
+
+    def _run_cloc_files(
+        self, files: list[Path], language: str
+    ) -> dict[str, Any] | None:
+        """Run cloc on a list of specific files and return LOC data."""
+        if not files:
+            return None
+        try:
+            cmd = ["cloc", "--json"] + [str(f) for f in files]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode == 0:
+                data: dict[str, Any] = json.loads(result.stdout)
+                lang_data: dict[str, Any] = data.get(language, {})
+                return lang_data
+        except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _count_rust_loc_with_inline_tests(self, src_path: Path) -> tuple[int, int]:
+        """Count Rust LOC separating production from inline #[cfg(test)] code.
+
+        Rust allows inline test modules marked with #[cfg(test)] within source
+        files. This method separates code lines before the marker (production)
+        from code lines after the marker (test).
+
+        Args:
+            src_path: Path to the src/ directory containing .rs files
+
+        Returns:
+            Tuple of (production_loc, inline_test_loc) where both counts
+            exclude blank lines and single-line comments.
+        """
+        prod_lines = 0
+        test_lines = 0
+
+        for rs_file in src_path.glob("*.rs"):
+            try:
+                content = rs_file.read_text()
+            except OSError:
+                continue
+
+            lines = content.split("\n")
+
+            # Find #[cfg(test)] marker
+            cfg_test_line: int | None = None
+            for i, line in enumerate(lines):
+                if "#[cfg(test)]" in line:
+                    cfg_test_line = i
+                    break
+
+            if cfg_test_line is not None:
+                # Lines before marker are production
+                for line in lines[:cfg_test_line]:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("//"):
+                        prod_lines += 1
+                # Lines from marker onward are test
+                for line in lines[cfg_test_line:]:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("//"):
+                        test_lines += 1
+            else:
+                # No test marker - all lines are production
+                for line in lines:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("//"):
+                        prod_lines += 1
+
+        return prod_lines, test_lines
 
     def _run_lizard(self, path: Path, language: str) -> dict[str, Any] | None:
         """Run lizard and return complexity data."""
@@ -501,6 +632,36 @@ class PostHocAnalyzer:
             return len(deps)
 
         return 0
+
+    def _count_go_deps(self, go_mod: Path) -> int:
+        """Count Go dependencies from go.mod file."""
+        try:
+            content = go_mod.read_text()
+            # Count require statements
+            # Can be single line: require github.com/foo/bar v1.0.0
+            # Or block: require ( ... )
+            import re
+
+            # Single-line requires
+            single_requires = re.findall(r"^require\s+\S+", content, re.MULTILINE)
+
+            # Block requires (count lines inside require blocks)
+            block_requires: list[str] = []
+            in_block = False
+            for line in content.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("require ("):
+                    in_block = True
+                    continue
+                if in_block:
+                    if stripped == ")":
+                        in_block = False
+                    elif stripped and not stripped.startswith("//"):
+                        block_requires.append(stripped)
+
+            return len(single_requires) + len(block_requires)
+        except OSError:
+            return 0
 
     def _calculate_mi_from_metrics(self, loc: int, avg_cc: float) -> float | None:
         """Calculate Maintainability Index from LOC and cyclomatic complexity.
