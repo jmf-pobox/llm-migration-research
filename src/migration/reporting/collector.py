@@ -8,19 +8,21 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 from .schema import (
-    MigrationMetrics,
-    IdentityMetrics,
-    TimingMetrics,
-    CostMetrics,
-    TokenMetrics,
     AgentMetrics,
+    CodeMetrics,
+    CostMetrics,
+    CoverageResult,
+    IdentityMetrics,
+    IdiomaticnessResult,
+    MigrationMetrics,
     ModuleTiming,
     OutcomeMetrics,
     QualityGates,
-    CoverageResult,
+    TimingMetrics,
+    TokenMetrics,
 )
 
 
@@ -71,6 +73,8 @@ class MetricsCollector:
         self.agent = AgentMetrics()
         self.outcome = OutcomeMetrics()
         self.quality_gates = QualityGates()
+        self.source_metrics = CodeMetrics()
+        self.target_metrics = CodeMetrics()
 
         # Internal tracking
         self._phase_start_times: dict[str, float] = {}
@@ -86,18 +90,24 @@ class MetricsCollector:
     def end_phase(self, phase_name: str) -> None:
         """Mark the end of a migration phase."""
         if phase_name in self._phase_start_times:
-            duration_ms = int((time.time() - self._phase_start_times[phase_name]) * 1000)
+            duration_ms = int(
+                (time.time() - self._phase_start_times[phase_name]) * 1000
+            )
             self.timing.phase_durations_ms[phase_name] = duration_ms
 
     def start_module(self, module_name: str) -> None:
         """Mark the start of a module migration."""
         self._module_start_times[module_name] = time.time()
-        self._module_attempts[module_name] = self._module_attempts.get(module_name, 0) + 1
+        self._module_attempts[module_name] = (
+            self._module_attempts.get(module_name, 0) + 1
+        )
 
-    def end_module(self, module_name: str, attempts: Optional[int] = None) -> None:
+    def end_module(self, module_name: str, attempts: int | None = None) -> None:
         """Mark the end of a module migration."""
         if module_name in self._module_start_times:
-            duration_ms = int((time.time() - self._module_start_times[module_name]) * 1000)
+            duration_ms = int(
+                (time.time() - self._module_start_times[module_name]) * 1000
+            )
             actual_attempts = attempts or self._module_attempts.get(module_name, 1)
             self.timing.module_durations.append(
                 ModuleTiming(
@@ -141,6 +151,66 @@ class MetricsCollector:
             line_coverage_pct=line_coverage,
             function_coverage_pct=None,
             branch_coverage_pct=None,
+        )
+
+    def record_idiomaticness(
+        self, score: str | None, reasoning: str | None = None
+    ) -> None:
+        """Record idiomaticness evaluation result.
+
+        Args:
+            score: One of "Idiomatic", "Acceptable", "Non-idiomatic", or None
+            reasoning: Optional explanation for the score
+        """
+        self.quality_gates.idiomaticness = IdiomaticnessResult(
+            score=score,
+            reasoning=reasoning,
+        )
+
+    def record_source_loc(
+        self,
+        production_loc: int,
+        test_loc: int = 0,
+        module_count: int = 0,
+        function_count: int = 0,
+    ) -> None:
+        """Record source code LOC metrics.
+
+        Args:
+            production_loc: Lines of production code
+            test_loc: Lines of test code
+            module_count: Number of modules/files
+            function_count: Number of functions
+        """
+        self.source_metrics = CodeMetrics(
+            production_loc=production_loc,
+            test_loc=test_loc,
+            total_loc=production_loc + test_loc,
+            module_count=module_count,
+            function_count=function_count,
+        )
+
+    def record_target_loc(
+        self,
+        production_loc: int,
+        test_loc: int = 0,
+        module_count: int = 0,
+        function_count: int = 0,
+    ) -> None:
+        """Record target code LOC metrics.
+
+        Args:
+            production_loc: Lines of production code
+            test_loc: Lines of test code
+            module_count: Number of modules/files
+            function_count: Number of functions
+        """
+        self.target_metrics = CodeMetrics(
+            production_loc=production_loc,
+            test_loc=test_loc,
+            total_loc=production_loc + test_loc,
+            module_count=module_count,
+            function_count=function_count,
         )
 
     def record_result(self, result: Any) -> None:
@@ -197,8 +267,8 @@ class MetricsCollector:
         status: str,
         modules_completed: int = 0,
         modules_total: int = 0,
-        blocking_issues: Optional[list[str]] = None,
-        notes: Optional[str] = None,
+        blocking_issues: list[str] | None = None,
+        notes: str | None = None,
     ) -> None:
         """Set the final outcome of the migration."""
         self.outcome.status = status
@@ -227,6 +297,8 @@ class MetricsCollector:
             cost=self.cost,
             tokens=self.tokens,
             agent=self.agent,
+            source_metrics=self.source_metrics,
+            target_metrics=self.target_metrics,
             outcome=self.outcome,
             quality_gates=self.quality_gates,
         )

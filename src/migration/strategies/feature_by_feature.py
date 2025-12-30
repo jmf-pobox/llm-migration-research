@@ -11,9 +11,9 @@ migrates feature-by-feature:
 This mirrors how codebases are originally built - incrementally adding capabilities.
 """
 
-from .base import MigrationStrategy, MigrationSlice
 from ..config import ProjectConfig
 from ..languages.base import LanguageTarget
+from .base import MigrationSlice, MigrationStrategy
 
 
 class FeatureByFeatureStrategy(MigrationStrategy):
@@ -50,7 +50,7 @@ class FeatureByFeatureStrategy(MigrationStrategy):
     ) -> str:
         """Generate feature-by-feature migration prompt."""
         features_list = "\n".join(
-            f"    {i+1}. {f.name}: {f.description}"
+            f"    {i + 1}. {f.name}: {f.description}"
             for i, f in enumerate(config.features)
         )
 
@@ -82,9 +82,7 @@ class FeatureByFeatureStrategy(MigrationStrategy):
             for f in config.source_files
         )
 
-        quality_gates = "\n".join(
-            f"- `{cmd}`" for cmd in target.get_quality_gates()
-        )
+        quality_gates = "\n".join(f"- `{cmd}`" for cmd in target.get_quality_gates())
 
         return f"""
 Migrate the {config.name} {config.source_language.title()} codebase to {target.name.title()} using FEATURE-BY-FEATURE migration with I/O validation.

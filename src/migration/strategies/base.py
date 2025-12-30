@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from ..config import ProjectConfig
 from ..languages.base import LanguageTarget
@@ -14,10 +15,11 @@ class MigrationSlice:
     For module-by-module: one module.
     For feature-by-feature: one feature (may span multiple files).
     """
+
     name: str
     description: str
     source_files: list[str]  # Files this slice touches
-    test_inputs: list[dict]  # {input: str, output: str} for this slice
+    test_inputs: list[dict[str, Any]]  # {input: str, output: str} for this slice
 
 
 class MigrationStrategy(ABC):

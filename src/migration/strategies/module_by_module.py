@@ -4,9 +4,9 @@ This is the original approach: migrate each Python module to a corresponding
 target language module in dependency order.
 """
 
-from .base import MigrationStrategy, MigrationSlice
 from ..config import ProjectConfig
 from ..languages.base import LanguageTarget
+from .base import MigrationSlice, MigrationStrategy
 
 
 class ModuleByModuleStrategy(MigrationStrategy):
@@ -37,7 +37,7 @@ class ModuleByModuleStrategy(MigrationStrategy):
     ) -> str:
         """Generate module-by-module migration prompt."""
         modules_list = "\n".join(
-            f"    {i+1}. {m.source} -> {target.get_file_mapping(m.source)} ({m.phase} phase)"
+            f"    {i + 1}. {m.source} -> {target.get_file_mapping(m.source)} ({m.phase} phase)"
             for i, m in enumerate(config.modules)
         )
 
@@ -53,9 +53,7 @@ class ModuleByModuleStrategy(MigrationStrategy):
 
         test_inputs_list = "\n".join(f'    - "{inp}"' for inp in config.test_inputs)
 
-        quality_gates = "\n".join(
-            f"- `{cmd}`" for cmd in target.get_quality_gates()
-        )
+        quality_gates = "\n".join(f"- `{cmd}`" for cmd in target.get_quality_gates())
 
         return f"""
 Migrate the {config.name} {config.source_language.title()} codebase to {target.name.title()} using a multi-phase approach with I/O validation.

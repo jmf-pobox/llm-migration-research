@@ -5,14 +5,13 @@ analyzing migration metrics across many runs.
 """
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Optional
 
 from .schema import MigrationMetrics
-
 
 DEFAULT_DB_PATH = Path("migrations.db")
 
@@ -20,6 +19,7 @@ DEFAULT_DB_PATH = Path("migrations.db")
 @dataclass
 class AggregateStats:
     """Aggregated statistics across multiple migrations."""
+
     count: int
     avg_duration_ms: float
     median_duration_ms: float
@@ -29,7 +29,7 @@ class AggregateStats:
     avg_io_match_rate: float
     success_rate_pct: float
     avg_loc_expansion: float
-    avg_coverage_pct: Optional[float] = None
+    avg_coverage_pct: float | None = None
 
 
 class MigrationDatabase:
@@ -63,6 +63,8 @@ class MigrationDatabase:
         status TEXT,
         source_loc INTEGER,
         target_loc INTEGER,
+        source_test_loc INTEGER,
+        target_test_loc INTEGER,
         metrics_json TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -78,6 +80,11 @@ class MigrationDatabase:
     ALTER TABLE migrations ADD COLUMN line_coverage_pct REAL;
     """
 
+    MIGRATION_V3 = """
+    ALTER TABLE migrations ADD COLUMN source_test_loc INTEGER;
+    ALTER TABLE migrations ADD COLUMN target_test_loc INTEGER;
+    """
+
     def __init__(self, db_path: Path = DEFAULT_DB_PATH):
         self.db_path = db_path
         self._init_db()
@@ -91,14 +98,31 @@ class MigrationDatabase:
 
     def _run_migrations(self, conn: sqlite3.Connection) -> None:
         """Run schema migrations for existing databases."""
-        # Check if line_coverage_pct column exists
         cursor = conn.execute("PRAGMA table_info(migrations)")
         columns = [row[1] for row in cursor.fetchall()]
+
+        # V2: Add line_coverage_pct
         if "line_coverage_pct" not in columns:
             try:
-                conn.execute(self.MIGRATION_V2)
+                conn.execute("ALTER TABLE migrations ADD COLUMN line_coverage_pct REAL")
             except sqlite3.OperationalError:
-                pass  # Column already exists
+                pass
+
+        # V3: Add test LOC columns
+        if "source_test_loc" not in columns:
+            try:
+                conn.execute(
+                    "ALTER TABLE migrations ADD COLUMN source_test_loc INTEGER"
+                )
+            except sqlite3.OperationalError:
+                pass
+        if "target_test_loc" not in columns:
+            try:
+                conn.execute(
+                    "ALTER TABLE migrations ADD COLUMN target_test_loc INTEGER"
+                )
+            except sqlite3.OperationalError:
+                pass
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
@@ -119,8 +143,10 @@ class MigrationDatabase:
                 INSERT OR REPLACE INTO migrations (
                     run_id, project_name, source_language, target_language,
                     strategy, started_at, completed_at, duration_ms, cost_usd,
-                    io_match_rate, line_coverage_pct, status, source_loc, target_loc, metrics_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    io_match_rate, line_coverage_pct, status,
+                    source_loc, target_loc, source_test_loc, target_test_loc,
+                    metrics_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     metrics.identity.run_id,
@@ -137,11 +163,13 @@ class MigrationDatabase:
                     metrics.outcome.status,
                     metrics.source_metrics.production_loc,
                     metrics.target_metrics.production_loc,
+                    metrics.source_metrics.test_loc,
+                    metrics.target_metrics.test_loc,
                     metrics.to_json(),
                 ),
             )
 
-    def get(self, run_id: str) -> Optional[MigrationMetrics]:
+    def get(self, run_id: str) -> MigrationMetrics | None:
         """Get a single migration by run_id."""
         with self._connect() as conn:
             row = conn.execute(
@@ -154,17 +182,17 @@ class MigrationDatabase:
 
     def query(
         self,
-        project: Optional[str] = None,
-        target: Optional[str] = None,
-        strategy: Optional[str] = None,
-        status: Optional[str] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
+        project: str | None = None,
+        target: str | None = None,
+        strategy: str | None = None,
+        status: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
         limit: int = 100,
     ) -> list[MigrationMetrics]:
         """Query migrations with filters."""
-        conditions = []
-        params = []
+        conditions: list[str] = []
+        params: list[str | int] = []
 
         if project:
             conditions.append("project_name = ?")
@@ -203,10 +231,10 @@ class MigrationDatabase:
 
     def aggregate(
         self,
-        project: Optional[str] = None,
-        target: Optional[str] = None,
-        strategy: Optional[str] = None,
-    ) -> Optional[AggregateStats]:
+        project: str | None = None,
+        target: str | None = None,
+        strategy: str | None = None,
+    ) -> AggregateStats | None:
         """Compute aggregate statistics for filtered migrations."""
         conditions = []
         params = []
@@ -298,7 +326,9 @@ class MigrationDatabase:
 
             for group in groups:
                 value = group[0]
-                kwargs = {group_field.replace("_language", "").replace("_name", ""): value}
+                kwargs = {
+                    group_field.replace("_language", "").replace("_name", ""): value
+                }
                 stats = self.aggregate(**kwargs)
                 if stats:
                     results[value] = stats
@@ -325,7 +355,7 @@ class MigrationDatabase:
         """Count total migrations in database."""
         with self._connect() as conn:
             row = conn.execute("SELECT COUNT(*) FROM migrations").fetchone()
-            return row[0]
+            return int(row[0])
 
     def delete(self, run_id: str) -> bool:
         """Delete a migration by run_id."""

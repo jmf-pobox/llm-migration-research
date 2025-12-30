@@ -1,0 +1,210 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-migration"
+description = "Multi-agent LLM framework for cross-language code migration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    { name = "James Freeman", email = "jmf@pobox.com" },
+]
+dependencies = [
+    "pyyaml>=6.0",
+]
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Code Generators",
+    "Intended Audience :: Developers",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/jmf-pobox/llm-migration-research"
+"Bug Tracker" = "https://github.com/jmf-pobox/llm-migration-research/issues"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "radon>=6.0.0",
+    "xenon>=0.9.0",
+]
+sdk = [
+    "claude-agent-sdk>=0.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/migration"]
+
+[tool.hatch.build]
+exclude = [
+    ".gitignore",
+    "tests/",
+    "docs/",
+    "projects/",
+    "htmlcov/",
+]
+
+[tool.hatch.version]
+path = "src/migration/__version__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pyyaml>=6.0",
+    "jinja2>=3.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "radon>=6.0.0",
+    "xenon>=0.9.0",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "PYTHONPATH=src pytest {args:tests}"
+test-cov = "PYTHONPATH=src pytest --cov=src/migration --cov-report=term-missing --cov-report=html {args:tests}"
+lint = "ruff check ."
+format = "ruff format ."
+format-check = "ruff format --check ."
+type = "mypy src/migration"
+check = ["lint", "type", "test"]
+check-cov = ["lint", "type", "test-cov"]
+# Complexity metrics
+complexity = "radon cc src/ -s -a"
+complexity-detailed = "radon cc src/ -s"
+maintainability = "radon mi src/ -s"
+raw-metrics = "radon raw src/ -s"
+complexity-check = "xenon --max-absolute C --max-modules C --max-average B src/"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+exclude = [
+    "projects/",
+    "docs/",
+    "configs/",
+    "htmlcov/",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "SIM", # flake8-simplify
+    "RUF", # Ruff-specific rules
+    "S",   # flake8-bandit (security)
+    "T20", # flake8-print
+    "PTH", # flake8-use-pathlib
+    "C90", # mccabe complexity
+]
+
+ignore = [
+    "S101",  # Allow assert in tests
+    "PTH123",  # Path.open() is style preference, open() is fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "T20"]
+"src/migration/reporting/cli.py" = ["T20"]
+"src/migration/runner.py" = ["T20", "E501", "C901", "S110", "S602"]
+"run_migration.py" = ["T20", "E501"]
+# LLM prompt files intentionally have long lines for readability
+"src/migration/agents.py" = ["E501"]
+"src/migration/strategies/*.py" = ["E501"]
+# Language files and templates have long lines for readability
+"src/migration/languages/*.py" = ["E501"]
+"src/migration/reporting/generator.py" = ["E501"]
+# Analyzer uses subprocess for local CLI tools (safe usage)
+"src/migration/reporting/analyzer.py" = ["S603", "S607", "S108"]
+# Database has SQL queries with validated column names (not user input)
+"src/migration/reporting/database.py" = ["S608", "SIM105", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
+
+[tool.ruff.lint.isort]
+known-first-party = ["migration"]
+combine-as-imports = true
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "claude_agent_sdk.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "yaml.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "jinja2.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+
+[tool.coverage.run]
+source = ["src/migration"]
+omit = [
+    "tests/*",
+    "*/test_*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __str__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+precision = 2
+fail_under = 70

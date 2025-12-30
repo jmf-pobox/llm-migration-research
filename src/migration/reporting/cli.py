@@ -9,18 +9,15 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from .schema import MigrationMetrics
-from .collector import LogParser
 from .analyzer import PostHocAnalyzer
+from .collector import LogParser
 from .database import MigrationDatabase
 from .generator import ReportGenerator
-
+from .schema import MigrationMetrics
 
 DEFAULT_DB_PATH = Path("migrations.db")
 
@@ -151,11 +148,13 @@ def cmd_query(args: argparse.Namespace) -> int:
     for m in results:
         status_icon = "✓" if m.outcome.status == "success" else "✗"
         duration = f"{m.timing.wall_clock_duration_ms / 60000:.1f}min"
-        print(f"  {status_icon} {m.identity.run_id[:8]}  "
-              f"{m.identity.project_name} → {m.identity.target_language} "
-              f"({m.identity.strategy})  "
-              f"{duration}  ${m.cost.total_cost_usd:.2f}  "
-              f"I/O: {m.io_contract.match_rate_pct:.0f}%")
+        print(
+            f"  {status_icon} {m.identity.run_id[:8]}  "
+            f"{m.identity.project_name} → {m.identity.target_language} "
+            f"({m.identity.strategy})  "
+            f"{duration}  ${m.cost.total_cost_usd:.2f}  "
+            f"I/O: {m.io_contract.match_rate_pct:.0f}%"
+        )
 
     # Show aggregates if multiple results
     if len(results) > 1:
@@ -165,7 +164,7 @@ def cmd_query(args: argparse.Namespace) -> int:
             strategy=args.strategy,
         )
         if stats:
-            print(f"\nAggregate Statistics:")
+            print("\nAggregate Statistics:")
             print(f"  Count: {stats.count}")
             print(f"  Avg Duration: {stats.avg_duration_ms / 60000:.1f}min")
             print(f"  Avg Cost: ${stats.avg_cost_usd:.2f}")
@@ -278,7 +277,7 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     print(f"Inserted into database: {args.database}")
 
     # Print summary
-    print(f"\nBackfill Summary:")
+    print("\nBackfill Summary:")
     print(f"  Run ID: {metrics.identity.run_id}")
     print(f"  Project: {metrics.identity.project_name}")
     print(f"  Strategy: {metrics.identity.strategy}")
@@ -305,18 +304,22 @@ def cmd_stats(args: argparse.Namespace) -> int:
     if by_target:
         print("By Target Language:")
         for target, stats in by_target.items():
-            print(f"  {target}: {stats.count} runs, "
-                  f"avg ${stats.avg_cost_usd:.2f}, "
-                  f"{stats.success_rate_pct:.0f}% success")
+            print(
+                f"  {target}: {stats.count} runs, "
+                f"avg ${stats.avg_cost_usd:.2f}, "
+                f"{stats.success_rate_pct:.0f}% success"
+            )
 
     # By strategy
     by_strategy = db.group_by("strategy")
     if by_strategy:
         print("\nBy Strategy:")
         for strat, stats in by_strategy.items():
-            print(f"  {strat}: {stats.count} runs, "
-                  f"avg ${stats.avg_cost_usd:.2f}, "
-                  f"{stats.success_rate_pct:.0f}% success")
+            print(
+                f"  {strat}: {stats.count} runs, "
+                f"avg ${stats.avg_cost_usd:.2f}, "
+                f"{stats.success_rate_pct:.0f}% success"
+            )
 
     # Projects
     projects = db.list_projects()
@@ -333,7 +336,8 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--database", "-d",
+        "--database",
+        "-d",
         type=Path,
         default=DEFAULT_DB_PATH,
         help="Path to SQLite database (default: migrations.db)",
@@ -356,13 +360,15 @@ def main() -> int:
     )
     p_report.add_argument("metrics_json", help="Path to metrics JSON file")
     p_report.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["markdown", "latex"],
         default="markdown",
         help="Output format (default: markdown)",
     )
     p_report.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         help="Output file path (default: stdout)",
     )
     p_report.set_defaults(func=cmd_report)
@@ -377,7 +383,8 @@ def main() -> int:
     p_query.add_argument("--strategy", "-s", help="Filter by strategy")
     p_query.add_argument("--status", help="Filter by status (success/failure)")
     p_query.add_argument(
-        "--limit", "-n",
+        "--limit",
+        "-n",
         type=int,
         default=20,
         help="Maximum results (default: 20)",
@@ -390,13 +397,15 @@ def main() -> int:
         help="Export database to various formats",
     )
     p_export.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["json", "markdown", "latex"],
         default="markdown",
         help="Output format (default: markdown)",
     )
     p_export.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         help="Output file path (default: stdout for markdown/latex)",
     )
     p_export.set_defaults(func=cmd_export)
@@ -412,14 +421,16 @@ def main() -> int:
         help="Run IDs to compare",
     )
     p_compare.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["markdown", "latex"],
         default="markdown",
         help="Output format (default: markdown)",
     )
     p_compare.add_argument("--title", help="Report title")
     p_compare.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         help="Output file path (default: stdout)",
     )
     p_compare.set_defaults(func=cmd_compare)
@@ -433,7 +444,8 @@ def main() -> int:
     p_backfill.add_argument("--project", "-p", help="Project name override")
     p_backfill.add_argument("--strategy", "-s", help="Strategy override")
     p_backfill.add_argument(
-        "--metrics-output", "-m",
+        "--metrics-output",
+        "-m",
         help="Metrics JSON output path",
     )
     p_backfill.set_defaults(func=cmd_backfill)
@@ -446,7 +458,8 @@ def main() -> int:
     p_stats.set_defaults(func=cmd_stats)
 
     args = parser.parse_args()
-    return args.func(args)
+    result = args.func(args)
+    return int(result) if result is not None else 0
 
 
 if __name__ == "__main__":

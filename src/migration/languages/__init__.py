@@ -1,9 +1,9 @@
 """Language target definitions for the migration framework."""
 
 from .base import LanguageTarget
-from .rust import RustTarget
-from .java import JavaTarget
 from .go import GoTarget
+from .java import JavaTarget
+from .rust import RustTarget
 
 LANGUAGE_REGISTRY: dict[str, type[LanguageTarget]] = {
     "rust": RustTarget,
@@ -20,4 +20,11 @@ def get_language_target(name: str) -> LanguageTarget:
     return LANGUAGE_REGISTRY[name]()
 
 
-__all__ = ["LanguageTarget", "RustTarget", "JavaTarget", "GoTarget", "get_language_target", "LANGUAGE_REGISTRY"]
+__all__ = [
+    "LANGUAGE_REGISTRY",
+    "GoTarget",
+    "JavaTarget",
+    "LanguageTarget",
+    "RustTarget",
+    "get_language_target",
+]

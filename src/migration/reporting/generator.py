@@ -6,16 +6,16 @@ LaTeX reports from standardized migration metrics.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
-except ImportError:
-    raise ImportError("jinja2 is required for report generation. Install with: pip install jinja2")
+except ImportError as err:
+    raise ImportError(
+        "jinja2 is required for report generation. Install with: pip install jinja2"
+    ) from err
 
+from .database import MigrationDatabase
 from .schema import MigrationMetrics
-from .database import MigrationDatabase, AggregateStats
-
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -39,7 +39,7 @@ class ReportGenerator:
         md = generator.generate_summary(db)
     """
 
-    def __init__(self, templates_dir: Optional[Path] = None):
+    def __init__(self, templates_dir: Path | None = None):
         self.templates_dir = templates_dir or TEMPLATES_DIR
         self.env = Environment(
             loader=FileSystemLoader(self.templates_dir),
@@ -82,42 +82,48 @@ class ReportGenerator:
     def generate_run_report(self, metrics: MigrationMetrics) -> str:
         """Generate a Markdown report for a single migration run."""
         template = self.env.get_template("run_report.md.j2")
-        return template.render(
-            m=metrics,
-            generated_at=datetime.now().isoformat(),
+        return str(
+            template.render(
+                m=metrics,
+                generated_at=datetime.now().isoformat(),
+            )
         )
 
     def generate_comparison(
         self,
         runs: list[MigrationMetrics],
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> str:
         """Generate a Markdown comparison of multiple runs."""
         template = self.env.get_template("comparison.md.j2")
-        return template.render(
-            runs=runs,
-            title=title or "Migration Comparison",
-            generated_at=datetime.now().isoformat(),
+        return str(
+            template.render(
+                runs=runs,
+                title=title or "Migration Comparison",
+                generated_at=datetime.now().isoformat(),
+            )
         )
 
     def generate_latex_table(
         self,
         runs: list[MigrationMetrics],
-        caption: Optional[str] = None,
-        label: Optional[str] = None,
+        caption: str | None = None,
+        label: str | None = None,
     ) -> str:
         """Generate a LaTeX table for inclusion in academic papers."""
         template = self.env.get_template("table.tex.j2")
-        return template.render(
-            runs=runs,
-            caption=caption or "Migration Results",
-            label=label or "tab:migrations",
+        return str(
+            template.render(
+                runs=runs,
+                caption=caption or "Migration Results",
+                label=label or "tab:migrations",
+            )
         )
 
     def generate_summary(
         self,
         db: MigrationDatabase,
-        title: Optional[str] = None,
+        title: str | None = None,
     ) -> str:
         """Generate an aggregated summary from the database."""
         template = self.env.get_template("summary.md.j2")
@@ -128,14 +134,16 @@ class ReportGenerator:
         by_strategy = db.group_by("strategy")
         projects = db.list_projects()
 
-        return template.render(
-            title=title or "Migration Summary",
-            total_count=db.count(),
-            total_stats=total_stats,
-            by_target=by_target,
-            by_strategy=by_strategy,
-            projects=projects,
-            generated_at=datetime.now().isoformat(),
+        return str(
+            template.render(
+                title=title or "Migration Summary",
+                total_count=db.count(),
+                total_stats=total_stats,
+                by_target=by_target,
+                by_strategy=by_strategy,
+                projects=projects,
+                generated_at=datetime.now().isoformat(),
+            )
         )
 
 
@@ -165,7 +173,7 @@ def create_default_templates() -> None:
 
 
 # Default templates
-RUN_REPORT_TEMPLATE = '''# Migration Report: {{ m.identity.project_name }}
+RUN_REPORT_TEMPLATE = """# Migration Report: {{ m.identity.project_name }}
 
 **Run ID:** `{{ m.identity.run_id }}`
 **Generated:** {{ generated_at }}
@@ -251,9 +259,9 @@ RUN_REPORT_TEMPLATE = '''# Migration Report: {{ m.identity.project_name }}
 
 ---
 *Schema version: {{ m.schema_version }}*
-'''
+"""
 
-COMPARISON_TEMPLATE = '''# {{ title }}
+COMPARISON_TEMPLATE = """# {{ title }}
 
 **Generated:** {{ generated_at }}
 
@@ -288,9 +296,9 @@ COMPARISON_TEMPLATE = '''# {{ title }}
 
 ---
 *{{ runs | length }} runs compared*
-'''
+"""
 
-SUMMARY_TEMPLATE = '''# {{ title }}
+SUMMARY_TEMPLATE = """# {{ title }}
 
 **Generated:** {{ generated_at }}
 **Total Migrations:** {{ total_count }}
@@ -335,9 +343,9 @@ SUMMARY_TEMPLATE = '''# {{ title }}
 
 ---
 *Aggregated from {{ total_count }} migration runs*
-'''
+"""
 
-LATEX_TABLE_TEMPLATE = r'''\begin{table}[h]
+LATEX_TABLE_TEMPLATE = r"""\begin{table}[h]
 \centering
 \caption{{ '{' }}{{ caption }}{{ '}' }}
 \label{{ '{' }}{{ label }}{{ '}' }}
@@ -353,4 +361,4 @@ I/O Match {% for r in runs %}& {{ "%.0f" | format(r.io_contract.match_rate_pct) 
 \bottomrule
 \end{tabular}
 \end{table}
-'''
+"""

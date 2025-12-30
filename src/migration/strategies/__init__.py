@@ -1,8 +1,8 @@
 """Migration strategies."""
 
 from .base import MigrationStrategy
-from .module_by_module import ModuleByModuleStrategy
 from .feature_by_feature import FeatureByFeatureStrategy
+from .module_by_module import ModuleByModuleStrategy
 
 STRATEGY_REGISTRY: dict[str, type[MigrationStrategy]] = {
     "module-by-module": ModuleByModuleStrategy,

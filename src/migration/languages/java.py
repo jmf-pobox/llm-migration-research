@@ -130,6 +130,7 @@ Apply these patterns for modern, idiomatic Java (17+):
 
     def parse_coverage_output(self, output: str) -> float | None:
         import re
+
         # JaCoCo HTML output contains percentage like "95%"
         match = re.search(r"(\d+)%", output)
         if match:

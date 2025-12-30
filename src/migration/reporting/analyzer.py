@@ -7,16 +7,16 @@ to capture code metrics that aren't available during migration.
 import json
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from .schema import (
     CodeMetrics,
-    QualityGates,
     CompilationResult,
-    LintingResult,
-    FormattingResult,
-    TestResult,
     CoverageResult,
+    FormattingResult,
+    LintingResult,
+    QualityGates,
+    TestResult,
 )
 
 
@@ -181,7 +181,7 @@ class PostHocAnalyzer:
 
         return quality
 
-    def _run_cloc(self, path: Path, language: str) -> Optional[dict]:
+    def _run_cloc(self, path: Path, language: str) -> dict[str, Any] | None:
         """Run cloc and return LOC data for specified language."""
         try:
             result = subprocess.run(
@@ -191,13 +191,14 @@ class PostHocAnalyzer:
                 timeout=60,
             )
             if result.returncode == 0:
-                data = json.loads(result.stdout)
-                return data.get(language, {})
+                data: dict[str, Any] = json.loads(result.stdout)
+                lang_data: dict[str, Any] = data.get(language, {})
+                return lang_data
         except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
             pass
         return None
 
-    def _run_lizard(self, path: Path, language: str) -> Optional[dict]:
+    def _run_lizard(self, path: Path, language: str) -> dict[str, Any] | None:
         """Run lizard and return complexity data."""
         try:
             result = subprocess.run(
@@ -354,6 +355,7 @@ class PostHocAnalyzer:
             if result.total == 0:
                 # Look for "test result: ok. X passed; Y failed"
                 import re
+
                 match = re.search(
                     r"(\d+) passed.*?(\d+) failed",
                     proc.stdout + proc.stderr,
@@ -414,7 +416,7 @@ class PostHocAnalyzer:
 
         return result
 
-    def _run_radon_mi(self, path: Path) -> Optional[float]:
+    def _run_radon_mi(self, path: Path) -> float | None:
         """Run radon mi and return average Maintainability Index."""
         try:
             result = subprocess.run(
@@ -481,6 +483,7 @@ class PostHocAnalyzer:
             content = gradle_file.read_text()
             # Count implementation/api/compile dependencies
             import re
+
             deps = re.findall(
                 r"(implementation|api|compile|testImplementation)\s*['\"]",
                 content,
@@ -493,14 +496,13 @@ class PostHocAnalyzer:
             content = pom_file.read_text()
             # Count <dependency> tags (excluding test scope)
             import re
+
             deps = re.findall(r"<dependency>", content)
             return len(deps)
 
         return 0
 
-    def _calculate_mi_from_metrics(
-        self, loc: int, avg_cc: float
-    ) -> Optional[float]:
+    def _calculate_mi_from_metrics(self, loc: int, avg_cc: float) -> float | None:
         """Calculate Maintainability Index from LOC and cyclomatic complexity.
 
         Uses simplified formula: MI = 171 - 5.2*ln(HV) - 0.23*CC - 16.2*ln(LOC)

@@ -4,19 +4,19 @@ This module defines the standardized data structures for capturing
 and analyzing migration metrics at scale.
 """
 
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from enum import Enum
-from typing import Optional
 import json
 import uuid
-
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 SCHEMA_VERSION = "1.0.0"
 
 
 class MigrationStatus(Enum):
     """Outcome status of a migration run."""
+
     SUCCESS = "success"
     PARTIAL = "partial"
     FAILURE = "failure"
@@ -24,6 +24,7 @@ class MigrationStatus(Enum):
 
 class MigrationStrategy(Enum):
     """Migration strategy used."""
+
     MODULE_BY_MODULE = "module-by-module"
     FEATURE_BY_FEATURE = "feature-by-feature"
 
@@ -31,16 +32,17 @@ class MigrationStrategy(Enum):
 @dataclass
 class IdentityMetrics:
     """Identifies a specific migration run."""
+
     run_id: str
     project_name: str
     source_language: str
     target_language: str
     strategy: str
     started_at: str  # ISO 8601
-    completed_at: Optional[str] = None  # ISO 8601
-    host_platform: Optional[str] = None
-    sdk_version: Optional[str] = None
-    model_id: Optional[str] = None
+    completed_at: str | None = None  # ISO 8601
+    host_platform: str | None = None
+    sdk_version: str | None = None
+    model_id: str | None = None
 
     @classmethod
     def create(
@@ -64,6 +66,7 @@ class IdentityMetrics:
 @dataclass
 class ModuleTiming:
     """Timing for a single module migration."""
+
     module_name: str
     duration_ms: int
     attempts: int = 1
@@ -72,6 +75,7 @@ class ModuleTiming:
 @dataclass
 class TimingMetrics:
     """Timing information for the migration."""
+
     wall_clock_duration_ms: int = 0
     api_duration_ms: int = 0
     phase_durations_ms: dict[str, int] = field(default_factory=dict)
@@ -81,6 +85,7 @@ class TimingMetrics:
 @dataclass
 class CostMetrics:
     """Cost breakdown for the migration."""
+
     total_cost_usd: float = 0.0
     input_tokens_cost_usd: float = 0.0
     output_tokens_cost_usd: float = 0.0
@@ -90,6 +95,7 @@ class CostMetrics:
 @dataclass
 class TokenMetrics:
     """Token usage statistics."""
+
     input_tokens: int = 0
     output_tokens: int = 0
     cache_creation_input_tokens: int = 0
@@ -107,6 +113,7 @@ class TokenMetrics:
 @dataclass
 class AgentMetrics:
     """Agent and tool usage statistics."""
+
     total_turns: int = 0
     total_messages: int = 0
     subagent_invocations: dict[str, int] = field(default_factory=dict)
@@ -118,6 +125,7 @@ class AgentMetrics:
 @dataclass
 class CodeMetrics:
     """Code complexity and size metrics."""
+
     production_loc: int = 0
     test_loc: int = 0
     total_loc: int = 0
@@ -126,12 +134,13 @@ class CodeMetrics:
     avg_cyclomatic_complexity: float = 0.0
     max_cyclomatic_complexity: int = 0
     external_dependencies: int = 0
-    maintainability_index: Optional[float] = None  # 0-100, higher is better
+    maintainability_index: float | None = None  # 0-100, higher is better
 
 
 @dataclass
 class CompilationResult:
     """Compilation quality gate result."""
+
     passed: bool = False
     error_count: int = 0
     warning_count: int = 0
@@ -140,6 +149,7 @@ class CompilationResult:
 @dataclass
 class LintingResult:
     """Linting quality gate result."""
+
     passed: bool = False
     tool: str = ""
     error_count: int = 0
@@ -149,6 +159,7 @@ class LintingResult:
 @dataclass
 class FormattingResult:
     """Formatting quality gate result."""
+
     passed: bool = False
     tool: str = ""
 
@@ -156,6 +167,7 @@ class FormattingResult:
 @dataclass
 class TestResult:
     """Test execution quality gate result."""
+
     passed: bool = False
     total: int = 0
     passed_count: int = 0
@@ -166,24 +178,36 @@ class TestResult:
 @dataclass
 class CoverageResult:
     """Test coverage metrics."""
-    line_coverage_pct: Optional[float] = None
-    function_coverage_pct: Optional[float] = None
-    branch_coverage_pct: Optional[float] = None
+
+    line_coverage_pct: float | None = None
+    function_coverage_pct: float | None = None
+    branch_coverage_pct: float | None = None
+
+
+@dataclass
+class IdiomaticnessResult:
+    """Code idiomaticness evaluation result."""
+
+    score: str | None = None  # "Idiomatic", "Acceptable", "Non-idiomatic"
+    reasoning: str | None = None
 
 
 @dataclass
 class QualityGates:
     """All quality gate results."""
+
     compilation: CompilationResult = field(default_factory=CompilationResult)
     linting: LintingResult = field(default_factory=LintingResult)
     formatting: FormattingResult = field(default_factory=FormattingResult)
     unit_tests: TestResult = field(default_factory=TestResult)
     coverage: CoverageResult = field(default_factory=CoverageResult)
+    idiomaticness: IdiomaticnessResult = field(default_factory=IdiomaticnessResult)
 
 
 @dataclass
 class FeatureResult:
     """I/O contract result for a single feature."""
+
     feature: str
     test_count: int
     passed: int
@@ -193,6 +217,7 @@ class FeatureResult:
 @dataclass
 class IOContractMetrics:
     """I/O contract validation results."""
+
     total_test_cases: int = 0
     passed: int = 0
     failed: int = 0
@@ -210,11 +235,12 @@ class IOContractMetrics:
 @dataclass
 class OutcomeMetrics:
     """Final outcome of the migration."""
+
     status: str = "failure"  # success, partial, failure
     modules_completed: int = 0
     modules_total: int = 0
     blocking_issues: list[str] = field(default_factory=list)
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @dataclass
@@ -224,6 +250,7 @@ class MigrationMetrics:
     This is the canonical data structure for all migration analysis.
     All reports, database entries, and comparisons derive from this.
     """
+
     identity: IdentityMetrics
     timing: TimingMetrics = field(default_factory=TimingMetrics)
     cost: CostMetrics = field(default_factory=CostMetrics)
@@ -250,7 +277,7 @@ class MigrationMetrics:
             return 0.0
         return self.cost.total_cost_usd / self.source_metrics.production_loc
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         data = asdict(self)
         # Add computed properties
@@ -265,7 +292,7 @@ class MigrationMetrics:
         return json.dumps(self.to_dict(), indent=indent)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "MigrationMetrics":
+    def from_dict(cls, data: dict[str, Any]) -> "MigrationMetrics":
         """Create from dictionary."""
         # Handle nested dataclasses
         identity = IdentityMetrics(**data["identity"])
@@ -281,21 +308,24 @@ class MigrationMetrics:
         tokens = TokenMetrics(
             input_tokens=data["tokens"].get("input_tokens", 0),
             output_tokens=data["tokens"].get("output_tokens", 0),
-            cache_creation_input_tokens=data["tokens"].get("cache_creation_input_tokens", 0),
+            cache_creation_input_tokens=data["tokens"].get(
+                "cache_creation_input_tokens", 0
+            ),
             cache_read_input_tokens=data["tokens"].get("cache_read_input_tokens", 0),
         )
         agent = AgentMetrics(**data.get("agent", {}))
         source_metrics = CodeMetrics(**data.get("source_metrics", {}))
         target_metrics = CodeMetrics(**data.get("target_metrics", {}))
 
-        # Quality gates
+        # Quality gates (handle None values)
         qg_data = data.get("quality_gates", {})
         quality_gates = QualityGates(
-            compilation=CompilationResult(**qg_data.get("compilation", {})),
-            linting=LintingResult(**qg_data.get("linting", {})),
-            formatting=FormattingResult(**qg_data.get("formatting", {})),
-            unit_tests=TestResult(**qg_data.get("unit_tests", {})),
-            coverage=CoverageResult(**qg_data.get("coverage", {})),
+            compilation=CompilationResult(**(qg_data.get("compilation") or {})),
+            linting=LintingResult(**(qg_data.get("linting") or {})),
+            formatting=FormattingResult(**(qg_data.get("formatting") or {})),
+            unit_tests=TestResult(**(qg_data.get("unit_tests") or {})),
+            coverage=CoverageResult(**(qg_data.get("coverage") or {})),
+            idiomaticness=IdiomaticnessResult(**(qg_data.get("idiomaticness") or {})),
         )
 
         # I/O contract

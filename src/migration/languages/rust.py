@@ -112,10 +112,12 @@ Apply these patterns to pass clippy on first attempt:
 
     def parse_coverage_output(self, output: str) -> float | None:
         import re
-        # cargo-llvm-cov format: "TOTAL  XX.XX%"
+
+        # cargo-llvm-cov text format: "TOTAL  <counts>  <pct>%  <counts>  <pct>%  <counts>  <pct>%"
+        # We want the first percentage (Region coverage)
         # tarpaulin format: "XX.XX% coverage"
         patterns = [
-            r"TOTAL\s+[\d.]+%\s+[\d.]+%\s+([\d.]+)%",  # llvm-cov
+            r"TOTAL\s+\d+\s+\d+\s+([\d.]+)%",  # llvm-cov (first percentage after counts)
             r"(\d+\.?\d*)%\s*coverage",  # tarpaulin
         ]
         for pattern in patterns:

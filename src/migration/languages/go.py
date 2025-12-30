@@ -120,6 +120,7 @@ Apply these patterns for idiomatic Go:
 
     def parse_coverage_output(self, output: str) -> float | None:
         import re
+
         # Go test -cover output: "coverage: 92.5% of statements"
         # May have multiple packages, we want the overall or average
         matches = re.findall(r"coverage:\s*([\d.]+)%\s*of\s*statements", output)

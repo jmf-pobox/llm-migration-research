@@ -130,6 +130,7 @@ class LanguageTarget(ABC):
             Coverage percentage (0-100) or None if not parseable
         """
         import re
+
         # Common patterns: "92.5% coverage", "Coverage: 92.5%", "92.5%"
         patterns = [
             r"(\d+\.?\d*)%\s*coverage",

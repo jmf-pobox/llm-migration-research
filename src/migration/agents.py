@@ -1,10 +1,12 @@
 """Language-agnostic agent definitions for the migration framework."""
 
-from .languages.base import LanguageTarget
+from typing import Any
+
 from .config import ProjectConfig
+from .languages.base import LanguageTarget
 
 
-def build_io_contract_agent(config: ProjectConfig, project_dir: str) -> dict:
+def build_io_contract_agent(config: ProjectConfig, project_dir: str) -> dict[str, Any]:
     """Build the I/O contract generator agent.
 
     This agent runs the source implementation on test inputs
@@ -64,7 +66,9 @@ Write the I/O contract to: {project_dir}/artifacts/PHASE_0_IO_CONTRACT.md
     }
 
 
-def build_analyst_agent(config: ProjectConfig, target: LanguageTarget, project_dir: str) -> dict:
+def build_analyst_agent(
+    config: ProjectConfig, target: LanguageTarget, project_dir: str
+) -> dict[str, Any]:
     """Build the analyst agent that reads source files and produces migration spec."""
     source_files_list = "\n".join(
         f"  - {config.source_directory}/{f}" for f in config.source_files
@@ -127,7 +131,7 @@ This is critical for behavioral validation during migration.""",
 
 def build_migrator_agent(
     config: ProjectConfig, target: LanguageTarget, project_dir: str
-) -> dict:
+) -> dict[str, Any]:
     """Build the migrator agent that converts modules to the target language."""
     source_dir = target.get_source_dir(project_dir)
     quality_gates = "\n".join(
@@ -174,6 +178,19 @@ For test file locations:
 - Java: `src/test/java/` with JUnit 5
 - Go: `*_test.go` files alongside source
 
+## CRITICAL: File Creation Rules
+
+DO NOT create any of the following:
+- Helper/analysis/documentation files with `main()` or `func main()` functions
+- Files named `check_*.go`, `analyze_*.go`, `example_*.go` in the root package (Go)
+- Any file that would conflict with existing entry points
+- Scratch files, temporary files, or debug utilities
+
+Only create:
+1. The migrated source files specified in the migration plan
+2. Test files in the correct test locations
+3. Build configuration files (Cargo.toml, build.gradle, go.mod) if needed
+
 ## I/O Contract Validation (Critical)
 
 The migration spec includes an I/O contract with expected input/output pairs.
@@ -191,7 +208,7 @@ Only report success when ALL quality gates pass AND I/O contract is satisfied AN
 
 def build_reviewer_agent(
     config: ProjectConfig, target: LanguageTarget, project_dir: str
-) -> dict:
+) -> dict[str, Any]:
     """Build the reviewer agent that validates migrated code."""
     source_dir = target.get_source_dir(project_dir)
 
@@ -263,7 +280,7 @@ Write output ONLY to the specified location above.""",
 
 def build_agents(
     config: ProjectConfig, target: LanguageTarget, project_dir: str
-) -> dict[str, dict]:
+) -> dict[str, dict[str, Any]]:
     """Build all agents for the migration.
 
     Args:
