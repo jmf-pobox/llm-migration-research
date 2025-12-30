@@ -44,6 +44,7 @@ See [docs/research/comparative_analysis.pdf](docs/research/comparative_analysis.
 │   ├── config.py             # YAML project configuration
 │   ├── agents.py             # Sub-agent prompt templates
 │   ├── runner.py             # SDK orchestration + metrics integration
+│   ├── checkpoint.py         # Resumable migration checkpoints
 │   ├── strategies/           # Migration approaches
 │   │   ├── base.py           # Strategy interface
 │   │   ├── module_by_module.py
@@ -86,6 +87,10 @@ python run_migration.py --target rust --project projects/rpn2tex --strategy feat
 
 # Dry run (show prompt without executing)
 python run_migration.py --target rust --project projects/rpn2tex --dry-run
+
+# Resume a failed migration (target/strategy inferred from checkpoint)
+python run_migration.py --resume projects/rpn2tex/migrations/rust-module-by-module-1 \
+  --project projects/rpn2tex
 ```
 
 ## Telemetry & Reporting
@@ -167,6 +172,34 @@ The framework generates an I/O contract from the source implementation before mi
 4. Validate target outputs match exactly
 
 This ensures behavioral equivalence regardless of implementation approach.
+
+## Checkpoints and Resumable Migrations
+
+Migrations automatically checkpoint progress to `.checkpoint/state.json` in the migration directory. If a migration fails mid-execution, resume from where it left off:
+
+```bash
+# Resume a failed migration
+python run_migration.py --resume /path/to/migration/dir --project projects/rpn2tex
+
+# Target and strategy are auto-inferred from checkpoint
+# You can override them explicitly if needed:
+python run_migration.py --resume /path/to/migration/dir --project projects/rpn2tex \
+  --target rust --strategy module-by-module
+```
+
+**How it works:**
+
+1. **Session-based resume**: Uses the SDK's `resume` option to continue the exact conversation state
+2. **Feature-level resume**: Tracks completed features for reconstruction if the session expires
+
+The checkpoint tracks:
+- Project, target language, and strategy
+- Current feature in progress
+- Completed features list
+- Failed feature and error message (if any)
+- Session ID for SDK resume
+
+On successful completion, the checkpoint is automatically cleared.
 
 ## Adding a New Project
 
