@@ -1,36 +1,39 @@
 # LLM Code Migration Research
 
-A research framework for studying LLM-assisted code migration strategies, collecting telemetry, and analyzing migration outcomes.
+A multi-agent LLM framework for autonomous cross-language code migration. Orchestrates Claude agents to migrate Python codebases to Rust, Java, or Go using either module-by-module or feature-by-feature strategies.
 
 ## What This Is
 
-This project provides infrastructure for understanding **how** LLMs migrate code:
+This project provides infrastructure for **autonomous** code migration:
 
-- **Migration Strategies** - Pluggable approaches (module-by-module, feature-by-feature) with different trade-offs
-- **Telemetry Collection** - Standardized metrics: timing, cost, tokens, code quality
+- **Multi-Agent Architecture** - Specialized agents for I/O contracts, analysis, migration, and review
+- **Migration Strategies** - Module-by-module (vertical slices) and feature-by-feature (horizontal slices)
+- **Telemetry Collection** - Standardized metrics: timing, cost, tokens, code quality, coverage
 - **Analysis & Reporting** - Aggregation across runs, Markdown/LaTeX report generation
 
-The framework uses the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/sdk) for execution, but the research focus is on strategy comparison and outcome analysis.
+The framework uses the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/sdk) for execution. Migrations run end-to-end without human intervention: agents read source code, generate target implementations, execute quality gates, and iterate on failures autonomously.
 
 ## Key Findings
 
-Migrated `rpn2tex` (Python → Rust/Java, 352 LOC source):
+Migrated `rpn2tex` (Python → Rust/Java/Go, 352 LOC source) with 6 configurations:
 
-| Target | Strategy | Duration | Cost | I/O Match |
-|--------|----------|----------|------|-----------|
-| Rust | Module-by-module | ~32 min | $6.53 | 100% |
-| Rust | Feature-by-feature | ~32 min | $4.63 | 100% |
-| Java | Module-by-module | ~26 min | $4.92 | 100% |
-| Java | Feature-by-feature | ~51 min | $6.27 | 100% |
+| Target | Strategy | Duration | Cost | Coverage | I/O Match |
+|--------|----------|----------|------|----------|-----------|
+| Rust | Module-by-module | 32 min | $8.83 | 94.7% | 100% |
+| Rust | Feature-by-feature | 60 min | $9.60 | 94.8% | 100% |
+| Java | Module-by-module | 37 min | $14.11 | 84.0% | 100% |
+| Java | Feature-by-feature | 55 min | $8.18 | 73.0% | 100% |
+| Go | Module-by-module | 37 min | $8.99 | 64.9% | 100% |
+| Go | Feature-by-feature | 56 min | $6.43 | 68.2% | 100% |
 
-**Insights:**
-- Strategy efficiency varies by target language
-- For Rust: feature-by-feature saves ~30% cost
-- For Java: module-by-module saves ~22% cost
-- Both strategies produce identical behavioral output
-- I/O contract validation ensures behavioral equivalence
+**Key observations:**
+- Module-by-module is consistently faster (32-37 min vs 55-60 min)
+- Cost varies without clear pattern by strategy ($6.43 to $14.11)
+- Coverage varies by language: Rust 94-95%, Java 73-84%, Go 65-68%
+- All migrations achieve 100% behavioral equivalence on 21-case I/O contract
+- Agents generate 2-4x more test code than production code
 
-See [docs/research/](docs/research/) for detailed analysis.
+See [docs/research/comparative_analysis.pdf](docs/research/comparative_analysis.pdf) for the full research paper.
 
 ## Project Structure
 
@@ -48,7 +51,8 @@ See [docs/research/](docs/research/) for detailed analysis.
 │   ├── languages/            # Target language configs
 │   │   ├── base.py           # Language target interface
 │   │   ├── rust.py
-│   │   └── java.py
+│   │   ├── java.py
+│   │   └── go.py
 │   └── reporting/            # Telemetry and analysis
 │       ├── schema.py         # MigrationMetrics dataclass
 │       ├── collector.py      # Real-time metrics collection
@@ -124,19 +128,15 @@ See [docs/REPORTING.md](docs/REPORTING.md) for the full API.
 
 Migrates each source module in dependency order. Each module is fully translated before moving to the next.
 
-**Pros:** Simpler prompts, easier to debug, more efficient for Java
-**Cons:** May produce redundant code
+**Characteristics:** Faster execution (32-37 min), simpler prompts, easier to debug
 
 ### Feature-by-Feature
 
 Migrates by feature slice, implementing end-to-end functionality incrementally. Validates I/O contract after each feature.
 
-**Pros:** More cohesive code, catches integration issues early, more efficient for Rust
-**Cons:** More complex orchestration
+**Characteristics:** More cohesive code, catches integration issues early, slower execution (55-60 min)
 
-**Note:** Strategy efficiency varies by target language. See research findings above.
-
-See [docs/STRATEGIES.md](docs/STRATEGIES.md) for details.
+Both strategies produce correct output for all test cases. Strategy selection does not affect correctness—only timing and cost (which varies without clear pattern).
 
 ## I/O Contract Validation
 
@@ -200,7 +200,9 @@ class MyStrategy(MigrationStrategy):
 
 | Document | Description |
 |----------|-------------|
-| [docs/research/](docs/research/) | Analysis papers and findings |
+| [docs/research/comparative_analysis.pdf](docs/research/comparative_analysis.pdf) | Research paper (main artifact) |
+| [docs/REPORTING.md](docs/REPORTING.md) | Telemetry and reporting framework |
+| [CLAUDE.md](CLAUDE.md) | Development instructions |
 
 ## License
 

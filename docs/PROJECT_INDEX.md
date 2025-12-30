@@ -1,101 +1,41 @@
-# Project Documentation Index
+# Documentation Index
 
-This document provides links to all project-specific reports and documentation generated during migrations.
-
-## Research Documents
-
-High-level analysis and findings:
+## Primary Documentation
 
 | Document | Description |
 |----------|-------------|
-| [MIGRATION_REPORT.md](research/MIGRATION_REPORT.md) | Detailed migration outcomes |
-| [COMPARATIVE_ANALYSIS.md](research/COMPARATIVE_ANALYSIS.md) | Strategy comparison |
-| [ANALYSIS_REPORT.md](research/ANALYSIS_REPORT.md) | Code metrics analysis |
-| [comparative_analysis.pdf](research/comparative_analysis.pdf) | LaTeX paper (PDF) |
-
-## Framework Documentation
-
-| Document | Description |
-|----------|-------------|
+| [comparative_analysis.pdf](research/comparative_analysis.pdf) | Research paper (main artifact) |
+| [comparative_analysis.tex](research/comparative_analysis.tex) | LaTeX source |
 | [REPORTING.md](REPORTING.md) | Telemetry and reporting framework |
 | [STRATEGIES.md](STRATEGIES.md) | Migration strategy guide |
-
----
 
 ## Project: rpn2tex
 
 **Source:** Python RPN-to-LaTeX converter (352 LOC)
-**Migrations:** Rust (2 strategies), Java (1 strategy)
+**Target languages:** Rust, Java, Go
+**Location:** `projects/rpn2tex/`
 
-### I/O Contract
+### Active Migrations
 
-The I/O contract captures expected behavior from the source implementation:
+| Target | Strategy | Path |
+|--------|----------|------|
+| Rust | Module-by-module | `projects/rpn2tex/migrations/rust-module-by-module-1/` |
+| Rust | Feature-by-feature | `projects/rpn2tex/migrations/rust-feature-by-feature-1/` |
+| Java | Module-by-module | `projects/rpn2tex/migrations/java-module-by-module-1/` |
+| Java | Feature-by-feature | `projects/rpn2tex/migrations/java-feature-by-feature-1/` |
+| Go | Module-by-module | `projects/rpn2tex/migrations/go-module-by-module-1/` |
+| Go | Feature-by-feature | `projects/rpn2tex/migrations/go-feature-by-feature-1/` |
 
-| Document | Description |
-|----------|-------------|
-| [IO_CONTRACT.md](../projects/rpn2tex/IO_CONTRACT.md) | Main I/O contract |
-| [VERIFIED_TEST_CASES.md](../projects/rpn2tex/VERIFIED_TEST_CASES.md) | 21 test cases with expected outputs |
-| [PHASE_0_COMPLETION_REPORT.md](../projects/rpn2tex/PHASE_0_COMPLETION_REPORT.md) | I/O contract generation report |
+### Archived Migrations
 
-### Migration: Rust (Module-by-Module)
-
-| Artifact | Path |
-|----------|------|
-| Source code | `projects/rpn2tex/migrations/rust-module-by-module/src/` |
-| Logs | `projects/rpn2tex/migrations/rust-module-by-module/logs/` |
-| Metrics | `projects/rpn2tex/migrations/rust-module-by-module/logs/metrics_*.json` |
-
-### Migration: Rust (Feature-by-Feature)
-
-| Artifact | Path |
-|----------|------|
-| Source code | `projects/rpn2tex/migrations/rust-feature-by-feature/src/` |
-| Logs | `projects/rpn2tex/migrations/rust-feature-by-feature/logs/` |
-
-**Feature Reports:**
-
-| Feature | Report | Status |
-|---------|--------|--------|
-| 1. Numbers | [FEATURE_1_NUMBERS_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_1_NUMBERS_REPORT.md) | Complete |
-| 2. Addition | [FEATURE_2_ADDITION_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_2_ADDITION_REPORT.md) | Complete |
-| 3. Subtraction | [FEATURE_3_SUBTRACTION_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_3_SUBTRACTION_REPORT.md) | Complete |
-| 4. Multiplication | [FEATURE_4_MULTIPLICATION_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_4_MULTIPLICATION_REPORT.md) | Complete |
-| 5. Division | [FEATURE_5_DIVISION_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_5_DIVISION_REPORT.md) | Complete |
-| 6. Precedence | [FEATURE_6_PRECEDENCE_REPORT.md](../projects/rpn2tex/migrations/rust-feature-by-feature/FEATURE_6_PRECEDENCE_REPORT.md) | Complete |
-
-[Migration Status](../projects/rpn2tex/migrations/rust-feature-by-feature/MIGRATION_STATUS.md) | [README](../projects/rpn2tex/migrations/rust-feature-by-feature/README.md)
-
-### Migration: Java (Module-by-Module)
-
-| Artifact | Path |
-|----------|------|
-| Source code | `projects/rpn2tex/migrations/java-module-by-module/src/` |
-| Logs | `projects/rpn2tex/migrations/java-module-by-module/logs/` |
-
-**Reports:**
-
-| Document | Description |
-|----------|-------------|
-| [AST_MIGRATION_REPORT.md](../projects/rpn2tex/migrations/java-module-by-module/AST_MIGRATION_REPORT.md) | AST-based migration analysis |
-| [MIGRATION_LOG.md](../projects/rpn2tex/migrations/java-module-by-module/MIGRATION_LOG.md) | Migration progress log |
-
----
-
-## Project: txt2tex
-
-**Status:** Pending migration
-**Source:** Python LaTeX DSL compiler
-**Location:** `projects/txt2tex/source/`
-
----
+Earlier experimental runs are in `projects/rpn2tex/migrations_archive/`.
 
 ## Metrics Database
 
-Aggregated metrics from all migrations are stored in `migrations.db` (SQLite).
+Query migrations with the reporting CLI:
 
-Query with:
 ```bash
-python -m reporting stats
-python -m reporting query --project rpn2tex
-python -m reporting export --format markdown
+python -m migration.reporting stats
+python -m migration.reporting query --project rpn2tex
+python -m migration.reporting export --format markdown
 ```

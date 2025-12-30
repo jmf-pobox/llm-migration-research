@@ -40,16 +40,11 @@ Migrates each source module (file) in dependency order. Each module is fully tra
 - Phase 2: Sequential Migration (per module)
 - Phase 3: Sequential Review (per module)
 
-**Pros:**
-- Faster execution (~25 min for rpn2tex)
+**Characteristics:**
+- Faster execution (32-37 min)
 - Simpler prompts
 - Easier to debug (one module at a time)
-- Lower cost
-
-**Cons:**
-- May produce redundant code across modules
-- Less cohesive architecture
-- Larger code output (+27% vs feature-by-feature)
+- Generates more test code per module
 
 **Usage:**
 ```bash
@@ -81,47 +76,45 @@ Migrates by feature slice, implementing end-to-end functionality incrementally. 
 5. Division - Division with fraction notation
 6. Precedence - Complex expressions with mixed operators
 
-**Pros:**
+**Characteristics:**
 - More cohesive, focused code
-- Catches integration issues early
-- Produces 21% less code
-- Better architectural decisions
-
-**Cons:**
-- 72% longer execution time (~43 min)
+- Catches integration issues early via incremental I/O validation
+- Slower execution (55-60 min)
 - More complex orchestration
-- Higher cost per run
-- Requires careful feature decomposition
 
 **Usage:**
 ```bash
 python run_migration.py --target rust --project projects/rpn2tex --strategy feature-by-feature
 ```
 
-## Comparison
+## Comparison (from 6 migrations)
 
-| Metric | Module-by-Module | Feature-by-Feature |
-|--------|------------------|-------------------|
-| Duration | 25 min | 43 min |
-| Cost | $3.74 | $6.07 |
-| Production LOC | 1,184 | 931 |
-| Test LOC | 2,191 | 3,025 |
-| I/O Match | 100% | 100% |
-| Code Style | More boilerplate | More cohesive |
+| Target | Strategy | Duration | Cost | Coverage |
+|--------|----------|----------|------|----------|
+| Rust | MbM | 32 min | $8.83 | 94.7% |
+| Rust | FbF | 60 min | $9.60 | 94.8% |
+| Java | MbM | 37 min | $14.11 | 84.0% |
+| Java | FbF | 55 min | $8.18 | 73.0% |
+| Go | MbM | 37 min | $8.99 | 64.9% |
+| Go | FbF | 56 min | $6.43 | 68.2% |
+
+**Key findings:**
+- Module-by-module is consistently faster (32-37 min vs 55-60 min)
+- Cost varies without clear pattern by strategy
+- Both strategies achieve 100% I/O contract match
+- Coverage varies by language, not strategy
 
 ## Choosing a Strategy
 
 **Use Module-by-Module when:**
-- Rapid iteration is needed
-- Budget is constrained
-- Source modules are already well-structured
+- Speed is priority
+- Source modules are well-structured with clear dependencies
 - You want predictable, straightforward migration
 
 **Use Feature-by-Feature when:**
-- Code quality is paramount
-- You want minimal, focused output
+- You want more cohesive code
 - The source has tightly coupled features
-- You need continuous validation during migration
+- You need continuous I/O validation during migration
 
 ## Adding a New Strategy
 
