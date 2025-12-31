@@ -1,0 +1,178 @@
+I/O CONTRACT FOR RPN2TEX PYTHON IMPLEMENTATION
+==================================================
+
+Source: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source
+Generated: 2025-12-29
+
+TEST CASES
+==========
+
+Test Case 1:
+INPUT: 5 3 +
+EXPECTED_OUTPUT: $5 + 3$
+STATUS: PASS
+CATEGORY: Basic addition
+
+Test Case 2:
+INPUT: 5 3 -
+EXPECTED_OUTPUT: $5 - 3$
+STATUS: PASS
+CATEGORY: Basic subtraction
+
+Test Case 3:
+INPUT: 4 7 *
+EXPECTED_OUTPUT: $4 \times 7$
+STATUS: PASS
+CATEGORY: Basic multiplication
+
+Test Case 4:
+INPUT: 10 2 /
+EXPECTED_OUTPUT: $10 \div 2$
+STATUS: PASS
+CATEGORY: Basic division
+
+Test Case 5:
+INPUT: 2 3 ^
+EXPECTED_OUTPUT: ERROR
+ERROR_MESSAGE: Line 1, column 5: Unexpected character '^'
+ERROR_TYPE: LexerError
+STATUS: EXPECTED_ERROR
+CATEGORY: Unsupported operator (exponentiation)
+
+Test Case 6:
+INPUT: 5 3 + 2 *
+EXPECTED_OUTPUT: $( 5 + 3 ) \times 2$
+STATUS: PASS
+CATEGORY: Precedence handling - parentheses required
+
+Test Case 7:
+INPUT: 5 3 * 2 +
+EXPECTED_OUTPUT: $5 \times 3 + 2$
+STATUS: PASS
+CATEGORY: Precedence handling - no parentheses needed
+
+Test Case 8:
+INPUT: 10 2 / 5 *
+EXPECTED_OUTPUT: $10 \div 2 \times 5$
+STATUS: PASS
+CATEGORY: Same precedence operators
+
+Test Case 9:
+INPUT: 5 3 - 2 -
+EXPECTED_OUTPUT: $5 - 3 - 2$
+STATUS: PASS
+CATEGORY: Multiple subtractions
+
+Test Case 10:
+INPUT: 100 10 / 5 / 2 /
+EXPECTED_OUTPUT: $100 \div 10 \div 5 \div 2$
+STATUS: PASS
+CATEGORY: Multiple divisions
+
+Test Case 11:
+INPUT: 1 2 + 3 + 4 +
+EXPECTED_OUTPUT: $1 + 2 + 3 + 4$
+STATUS: PASS
+CATEGORY: Multiple additions
+
+Test Case 12:
+INPUT: 2 3 4 * +
+EXPECTED_OUTPUT: $2 + 3 \times 4$
+STATUS: PASS
+CATEGORY: Multiplication higher than addition
+
+Test Case 13:
+INPUT: 2 3 + 4 *
+EXPECTED_OUTPUT: $( 2 + 3 ) \times 4$
+STATUS: PASS
+CATEGORY: Parentheses for lower precedence operation
+
+Test Case 14:
+INPUT: 2 3 4 + *
+EXPECTED_OUTPUT: $2 \times ( 3 + 4 )$
+STATUS: PASS
+CATEGORY: Parentheses around addition in multiplication
+
+Test Case 15:
+INPUT: 2 3 * 4 +
+EXPECTED_OUTPUT: $2 \times 3 + 4$
+STATUS: PASS
+CATEGORY: Multiplication before addition
+
+Test Case 16:
+INPUT: 2 3 ^ 4 *
+EXPECTED_OUTPUT: ERROR
+ERROR_MESSAGE: Line 1, column 5: Unexpected character '^'
+ERROR_TYPE: LexerError
+STATUS: EXPECTED_ERROR
+CATEGORY: Unsupported operator (exponentiation)
+
+Test Case 17:
+INPUT: 2 3 4 ^ ^
+EXPECTED_OUTPUT: ERROR
+ERROR_MESSAGE: Line 1, column 7: Unexpected character '^'
+ERROR_TYPE: LexerError
+STATUS: EXPECTED_ERROR
+CATEGORY: Unsupported operator (exponentiation)
+
+Test Case 18:
+INPUT: 3.14 2 *
+EXPECTED_OUTPUT: $3.14 \times 2$
+STATUS: PASS
+CATEGORY: Floating point numbers
+
+Test Case 19:
+INPUT: 1.5 0.5 +
+EXPECTED_OUTPUT: $1.5 + 0.5$
+STATUS: PASS
+CATEGORY: Floating point addition
+
+Test Case 20:
+INPUT: 1 2 + 3 4 + *
+EXPECTED_OUTPUT: $( 1 + 2 ) \times ( 3 + 4 )$
+STATUS: PASS
+CATEGORY: Multiple complex subexpressions
+
+Test Case 21:
+INPUT: 10 2 / 3 + 4 *
+EXPECTED_OUTPUT: $( 10 \div 2 + 3 ) \times 4$
+STATUS: PASS
+CATEGORY: Mixed operations with precedence
+
+SUMMARY
+=======
+Total Test Cases: 21
+Passing Test Cases: 18
+Error Cases (Expected): 3
+Success Rate: 85.7%
+
+OPERATORS SUPPORTED
+===================
++ (Addition) -> rendered as " + "
+- (Subtraction) -> rendered as " - "
+* (Multiplication) -> rendered as " \times "
+/ (Division) -> rendered as " \div "
+
+OPERATORS NOT SUPPORTED
+=======================
+^ (Exponentiation) -> LexerError: Unexpected character '^'
+
+PRECEDENCE RULES
+================
+1. Multiplication (*) and Division (/) have HIGHER precedence
+2. Addition (+) and Subtraction (-) have LOWER precedence
+3. All operators are LEFT-ASSOCIATIVE
+4. Parentheses are added when lower-precedence operations appear as operands of higher-precedence operations
+
+OUTPUT FORMAT
+=============
+All valid outputs are wrapped in LaTeX math mode: $ ... $
+Spaces surround all operators in the output.
+Parentheses appear as ( and ) with spaces before and after content.
+
+NOTES
+=====
+- RPN (Reverse Polish Notation) input is converted to infix notation with proper parenthesization
+- All numbers (integers and floats) are preserved as-is in output
+- No simplification or evaluation of expressions occurs
+- Only syntactic transformation from RPN to LaTeX infix notation

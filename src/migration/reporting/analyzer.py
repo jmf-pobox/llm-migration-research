@@ -5,6 +5,7 @@ to capture code metrics that aren't available during migration.
 """
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -237,6 +238,181 @@ class PostHocAnalyzer:
         quality.coverage = self._get_cargo_coverage(target_path)
 
         return quality
+
+    def analyze_java_quality(self, target_path: Path) -> QualityGates:
+        """Run Java quality gates and return results."""
+        quality = QualityGates()
+
+        # Check compilation and tests (gradle/maven)
+        if (target_path / "build.gradle").exists():
+            quality.unit_tests = self._run_gradle_test(target_path)
+            quality.compilation.passed = quality.unit_tests.passed or (
+                self._check_gradle_compile(target_path)
+            )
+            quality.coverage = self._get_jacoco_coverage(target_path)
+        elif (target_path / "pom.xml").exists():
+            # Basic support for Maven if needed
+            pass
+
+        return quality
+
+    def analyze_go_quality(self, target_path: Path) -> QualityGates:
+        """Run Go quality gates and return results."""
+        quality = QualityGates()
+
+        # Check compilation
+        quality.compilation.passed = self._check_go_build(target_path)
+
+        # Run tests
+        quality.unit_tests = self._run_go_test(target_path)
+
+        # Get coverage
+        quality.coverage = self._get_go_coverage(target_path)
+
+        return quality
+
+    def _check_gradle_compile(self, path: Path) -> bool:
+        """Check if Java project compiles with Gradle."""
+        try:
+            proc = subprocess.run(
+                ["gradle", "classes"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            return proc.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+
+    def _run_gradle_test(self, path: Path) -> TestOutcomeResult:
+        """Run gradle test and return results."""
+        result = TestOutcomeResult()
+        try:
+            proc = subprocess.run(
+                ["gradle", "test"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            result.passed = proc.returncode == 0
+
+            # Parse test results from reports if they exist
+            # This is a bit complex as Gradle writes XML files.
+            # Simplified fallback: parse stdout for "X tests completed, Y failed"
+            import re
+
+            match = re.search(
+                r"(\d+) tests completed, (\d+) failed", proc.stdout + proc.stderr
+            )
+            if match:
+                result.total = int(match.group(1))
+                result.failed_count = int(match.group(2))
+                result.passed_count = result.total - result.failed_count
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return result
+
+    def _get_jacoco_coverage(self, path: Path) -> CoverageResult:
+        """Get test coverage from JaCoCo report."""
+        result = CoverageResult()
+        jacoco_xml = (
+            path / "build" / "reports" / "jacoco" / "test" / "jacocoTestReport.xml"
+        )
+        if jacoco_xml.exists():
+            try:
+                # Parse XML for line and branch coverage
+                from defusedxml import ElementTree  # type: ignore[import-untyped]
+                tree = ElementTree.parse(jacoco_xml)
+                root = tree.getroot()
+
+                for counter in root.findall("counter"):
+                    c_type = counter.get("type")
+                    missed = int(counter.get("missed", 0))
+                    covered = int(counter.get("covered", 0))
+                    total = missed + covered
+                    if total > 0:
+                        pct = (covered / total) * 100
+                        if c_type == "LINE":
+                            result.line_coverage_pct = pct
+                        elif c_type == "BRANCH":
+                            result.branch_coverage_pct = pct
+                        elif c_type == "METHOD":
+                            result.function_coverage_pct = pct
+            except Exception:  # noqa: S110
+                # Suppression intentional here as quality gate data is optional
+                pass
+        return result
+
+    def _check_go_build(self, path: Path) -> bool:
+        """Check if Go project compiles."""
+        try:
+            proc = subprocess.run(
+                ["go", "build", "./..."],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            return proc.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+
+    def _run_go_test(self, path: Path) -> TestOutcomeResult:
+        """Run go test and return results."""
+        result = TestOutcomeResult()
+        try:
+            proc = subprocess.run(
+                ["go", "test", "-v", "./..."],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            result.passed = proc.returncode == 0
+
+            # Parse verbose output for "PASS: TestName" or "FAIL: TestName"
+            passed = len(re.findall(r"--- PASS:", proc.stdout))
+            failed = len(re.findall(r"--- FAIL:", proc.stdout))
+            skipped = len(re.findall(r"--- SKIP:", proc.stdout))
+
+            result.passed_count = passed
+            result.failed_count = failed
+            result.skipped_count = skipped
+            result.total = passed + failed + skipped
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return result
+
+    def _get_go_coverage(self, path: Path) -> CoverageResult:
+        """Get test coverage for Go project."""
+        result = CoverageResult()
+        try:
+            # Run coverage
+            subprocess.run(
+                ["go", "test", "-coverprofile=coverage.out", "./..."],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            # Parse coverage summary
+            proc = subprocess.run(
+                ["go", "tool", "cover", "-func=coverage.out"],
+                cwd=path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if proc.returncode == 0:
+                # Look for "total: (statements) X.Y%"
+                match = re.search(r"total:\s+\(statements\)\s+(\d+\.\d+)%", proc.stdout)
+                if match:
+                    result.line_coverage_pct = float(match.group(1))
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return result
 
     def _run_cloc(self, path: Path, language: str) -> dict[str, Any] | None:
         """Run cloc and return LOC data for specified language."""

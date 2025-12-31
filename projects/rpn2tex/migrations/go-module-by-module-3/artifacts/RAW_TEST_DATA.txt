@@ -1,0 +1,148 @@
+# RAW TEST DATA - Python rpn2tex Implementation
+# Generated: 2025-12-30
+# Command: echo "INPUT" | python -m rpn2tex.cli -
+
+## TEST CASE 1
+INPUT: 5 3 +
+OUTPUT: $5 + 3$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 2
+INPUT: 5 3 -
+OUTPUT: $5 - 3$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 3
+INPUT: 4 7 *
+OUTPUT: $4 \times 7$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 4
+INPUT: 10 2 /
+OUTPUT: $10 \div 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 5
+INPUT: 2 3 ^
+OUTPUT: (empty)
+ERROR: Error: Unexpected character '^'
+ERROR_LINE: 1 | 2 3 ^
+ERROR_MARKER: 1 |     ^
+EXIT_CODE: 1
+
+## TEST CASE 6
+INPUT: 5 3 + 2 *
+OUTPUT: $( 5 + 3 ) \times 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 7
+INPUT: 5 3 * 2 +
+OUTPUT: $5 \times 3 + 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 8
+INPUT: 10 2 / 5 *
+OUTPUT: $10 \div 2 \times 5$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 9
+INPUT: 5 3 - 2 -
+OUTPUT: $5 - 3 - 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 10
+INPUT: 100 10 / 5 / 2 /
+OUTPUT: $100 \div 10 \div 5 \div 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 11
+INPUT: 1 2 + 3 + 4 +
+OUTPUT: $1 + 2 + 3 + 4$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 12
+INPUT: 2 3 4 * +
+OUTPUT: $2 + 3 \times 4$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 13
+INPUT: 2 3 + 4 *
+OUTPUT: $( 2 + 3 ) \times 4$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 14
+INPUT: 2 3 4 + *
+OUTPUT: $2 \times ( 3 + 4 )$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 15
+INPUT: 2 3 * 4 +
+OUTPUT: $2 \times 3 + 4$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 16
+INPUT: 2 3 ^ 4 *
+OUTPUT: (empty)
+ERROR: Error: Unexpected character '^'
+ERROR_LINE: 1 | 2 3 ^ 4 *
+ERROR_MARKER: 1 |     ^
+EXIT_CODE: 1
+
+## TEST CASE 17
+INPUT: 2 3 4 ^ ^
+OUTPUT: (empty)
+ERROR: Error: Unexpected character '^'
+ERROR_LINE: 1 | 2 3 4 ^ ^
+ERROR_MARKER: 1 |       ^
+EXIT_CODE: 1
+
+## TEST CASE 18
+INPUT: 3.14 2 *
+OUTPUT: $3.14 \times 2$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 19
+INPUT: 1.5 0.5 +
+OUTPUT: $1.5 + 0.5$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 20
+INPUT: 1 2 + 3 4 + *
+OUTPUT: $( 1 + 2 ) \times ( 3 + 4 )$
+ERROR: (none)
+EXIT_CODE: 0
+
+## TEST CASE 21
+INPUT: 10 2 / 3 + 4 *
+OUTPUT: $( 10 \div 2 + 3 ) \times 4$
+ERROR: (none)
+EXIT_CODE: 0
+
+## SUMMARY
+Total Tests: 21
+Passed: 18 (Exit Code 0, valid output)
+Failed: 3 (Exit Code 1, expected errors)
+Success Rate: 85.7%
+
+## NOTES
+- All successful outputs are wrapped in $...$ (LaTeX math mode)
+- Exponentiation operator ^ is not supported and causes lexer error
+- Parentheses are intelligently inserted based on operator precedence
+- Floating point numbers are preserved with decimal points
+- Operators use LaTeX symbols: \times for *, \div for /

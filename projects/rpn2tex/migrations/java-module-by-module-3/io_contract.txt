@@ -1,0 +1,205 @@
+================================================================================
+I/O CONTRACT FOR RPN2TEX MIGRATION
+================================================================================
+Source Implementation: Python (rpn2tex)
+Generated: 2025-12-30
+================================================================================
+
+TEST CASE 1
+INPUT: 5 3 +
+EXPECTED OUTPUT: $5 + 3$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 2
+INPUT: 5 3 -
+EXPECTED OUTPUT: $5 - 3$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 3
+INPUT: 4 7 *
+EXPECTED OUTPUT: $4 \times 7$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 4
+INPUT: 10 2 /
+EXPECTED OUTPUT: $10 \div 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 5
+INPUT: 2 3 ^
+EXPECTED OUTPUT: Error: Unexpected character '^'
+EXIT CODE: 1
+STATUS: ERROR (EXPECTED)
+NOTES: The ^ character is not recognized by the lexer.
+---
+
+TEST CASE 6
+INPUT: 5 3 + 2 *
+EXPECTED OUTPUT: $( 5 + 3 ) \times 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 7
+INPUT: 5 3 * 2 +
+EXPECTED OUTPUT: $5 \times 3 + 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 8
+INPUT: 10 2 / 5 *
+EXPECTED OUTPUT: $10 \div 2 \times 5$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 9
+INPUT: 5 3 - 2 -
+EXPECTED OUTPUT: $5 - 3 - 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 10
+INPUT: 100 10 / 5 / 2 /
+EXPECTED OUTPUT: $100 \div 10 \div 5 \div 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 11
+INPUT: 1 2 + 3 + 4 +
+EXPECTED OUTPUT: $1 + 2 + 3 + 4$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 12
+INPUT: 2 3 4 * +
+EXPECTED OUTPUT: $2 + 3 \times 4$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 13
+INPUT: 2 3 + 4 *
+EXPECTED OUTPUT: $( 2 + 3 ) \times 4$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 14
+INPUT: 2 3 4 + *
+EXPECTED OUTPUT: $2 \times ( 3 + 4 )$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 15
+INPUT: 2 3 * 4 +
+EXPECTED OUTPUT: $2 \times 3 + 4$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 16
+INPUT: 2 3 ^ 4 *
+EXPECTED OUTPUT: Error: Unexpected character '^'
+EXIT CODE: 1
+STATUS: ERROR (EXPECTED)
+---
+
+TEST CASE 17
+INPUT: 2 3 4 ^ ^
+EXPECTED OUTPUT: Error: Unexpected character '^'
+EXIT CODE: 1
+STATUS: ERROR (EXPECTED)
+---
+
+TEST CASE 18
+INPUT: 3.14 2 *
+EXPECTED OUTPUT: $3.14 \times 2$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 19
+INPUT: 1.5 0.5 +
+EXPECTED OUTPUT: $1.5 + 0.5$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 20
+INPUT: 1 2 + 3 4 + *
+EXPECTED OUTPUT: $( 1 + 2 ) \times ( 3 + 4 )$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+TEST CASE 21
+INPUT: 10 2 / 3 + 4 *
+EXPECTED OUTPUT: $( 10 \div 2 + 3 ) \times 4$
+EXIT CODE: 0
+STATUS: SUCCESS
+---
+
+================================================================================
+SUMMARY
+================================================================================
+Total Test Cases: 21
+Successful Cases: 18
+Error Cases (Expected): 3
+
+Error Case Details:
+  - Tests 5, 16, 17: Exponentiation operator (^) not supported
+  - All error cases properly detected by lexer
+  - Exit code 1 returned for all error cases
+
+LaTeX Operator Symbols:
+  - Addition: +
+  - Subtraction: -
+  - Multiplication: \times
+  - Division: \div
+  - Exponentiation: NOT SUPPORTED (^)
+
+Supported Input Types:
+  - Integer numbers (e.g., 5, 100)
+  - Decimal numbers (e.g., 3.14, 1.5)
+  - Binary operators: +, -, *, /
+  - Whitespace-separated tokens
+
+Output Format:
+  - All output wrapped in inline math mode: $...$
+  - Numbers preserved as-is (integer or decimal)
+  - Parentheses inserted only when needed for precedence
+  - Space-separated elements
+
+================================================================================
+VALIDATION CRITERIA
+================================================================================
+
+For Java migration validation:
+1. Exact output match for all 18 success cases (character-by-character)
+2. Proper error handling for exponentiation operator
+3. Error messages must indicate "Unexpected character '^'"
+4. Exit code must be 0 for success cases, 1 for error cases
+5. Decimal precision must be preserved
+6. LaTeX symbols must match exactly
+
+For Rust migration validation:
+1. Same criteria as Java migration
+2. Verify parenthesization logic is identical
+3. Ensure operator precedence is respected
+4. Validate error handling matches Python implementation
+
+================================================================================

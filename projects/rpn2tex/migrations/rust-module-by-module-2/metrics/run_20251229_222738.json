@@ -1,0 +1,129 @@
+{
+  "identity": {
+    "run_id": "7c827a09-29c1-4046-9bd0-a10e18a517c3",
+    "project_name": "rpn2tex",
+    "source_language": "python",
+    "target_language": "rust",
+    "strategy": "module-by-module",
+    "started_at": "2025-12-29T22:01:01.204958",
+    "completed_at": "2025-12-29T22:27:38.465802",
+    "host_platform": null,
+    "sdk_version": null,
+    "model_id": null
+  },
+  "timing": {
+    "wall_clock_duration_ms": 1593144,
+    "api_duration_ms": 3056871,
+    "phase_durations_ms": {
+      "setup": 0,
+      "migration": 1595032
+    },
+    "module_durations": []
+  },
+  "cost": {
+    "total_cost_usd": 7.901889600000006,
+    "input_tokens_cost_usd": 0.0,
+    "output_tokens_cost_usd": 0.0,
+    "cache_creation_cost_usd": 0.0
+  },
+  "tokens": {
+    "input_tokens": 18,
+    "output_tokens": 12178,
+    "cache_creation_input_tokens": 72595,
+    "cache_read_input_tokens": 221550,
+    "cache_efficiency_ratio": 0.9999187608318891
+  },
+  "agent": {
+    "total_turns": 24,
+    "total_messages": 912,
+    "subagent_invocations": {
+      "io_contract": 1,
+      "analyst": 1,
+      "migrator": 7,
+      "reviewer": 7
+    },
+    "tool_invocations": {
+      "Task": 16,
+      "Read": 126,
+      "Bash": 231,
+      "Write": 32,
+      "Glob": 19,
+      "Edit": 18
+    },
+    "error_recovery_events": 0,
+    "retry_count": 0
+  },
+  "source_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "target_metrics": {
+    "production_loc": 620,
+    "test_loc": 1490,
+    "total_loc": 2110,
+    "module_count": 8,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "quality_gates": {
+    "compilation": {
+      "passed": false,
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "linting": {
+      "passed": false,
+      "tool": "",
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "formatting": {
+      "passed": false,
+      "tool": ""
+    },
+    "unit_tests": {
+      "passed": false,
+      "total": 0,
+      "passed_count": 0,
+      "failed_count": 0,
+      "skipped_count": 0
+    },
+    "coverage": {
+      "line_coverage_pct": 93.36,
+      "function_coverage_pct": null,
+      "branch_coverage_pct": null
+    },
+    "idiomaticness": {
+      "score": null,
+      "reasoning": null
+    }
+  },
+  "io_contract": {
+    "total_test_cases": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "feature_results": [],
+    "match_rate_pct": 0.0
+  },
+  "outcome": {
+    "status": "success",
+    "modules_completed": 0,
+    "modules_total": 0,
+    "blocking_issues": [],
+    "notes": null
+  },
+  "schema_version": "1.0.0",
+  "loc_expansion_ratio": 0.0,
+  "cost_per_loc": 0.0
+}

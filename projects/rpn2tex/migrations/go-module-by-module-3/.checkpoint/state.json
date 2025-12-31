@@ -1,0 +1,11 @@
+{
+  "project": "rpn2tex",
+  "target": "go",
+  "strategy": "module-by-module",
+  "session_id": "b5deb14f-8a53-4862-82eb-a5405b9815e7",
+  "current_feature": null,
+  "completed_features": [],
+  "failed_feature": null,
+  "error_message": null,
+  "last_checkpoint_time": "2025-12-30T21:24:53.297882+00:00"
+}

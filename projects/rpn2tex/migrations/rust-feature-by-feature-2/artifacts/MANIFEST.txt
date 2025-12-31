@@ -1,0 +1,252 @@
+I/O CONTRACT VERIFICATION ARTIFACTS
+=====================================
+Date: 2025-12-30
+Status: COMPLETE AND VERIFIED
+
+ARTIFACT DIRECTORY
+==================
+/Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/rust-feature-by-feature-2/artifacts/
+
+FILES INCLUDED
+==============
+
+1. PHASE_0_IO_CONTRACT.md
+   Type: Markdown - Authoritative Specification
+   Size: 6.1 KB (141 lines)
+   Purpose: Official I/O contract specification
+   Contents:
+     - Test case definitions (21 tests)
+     - Operator mappings and precedence
+     - Output format specifications
+     - Parenthesization rules
+     - Implementation notes for migration
+   Use: Read this first for specification
+
+2. VERIFICATION_REPORT.md
+   Type: Markdown - Test Evidence
+   Size: 7.9 KB (256 lines)
+   Purpose: Documentation of test execution
+   Contents:
+     - Test statistics and summary
+     - Detailed results for all 21 tests
+     - Category breakdown
+     - Key findings and edge cases
+     - Migration recommendations
+   Use: Reference for validation evidence
+
+3. TEST_DATA.json
+   Type: JSON - Machine-Readable Data
+   Size: 6.5 KB (234 lines)
+   Purpose: Structured test data for automation
+   Contents:
+     - 21 test cases in JSON format
+     - Metadata (dates, counts, status)
+     - Operator definitions
+     - Output format rules
+   Use: Import for automated test validation
+
+4. README.md
+   Type: Markdown - Quick Reference Guide
+   Size: 6.4 KB (172 lines)
+   Purpose: Navigation and quick lookup
+   Contents:
+     - File descriptions and purposes
+     - Quick reference tables
+     - Test categories overview
+     - Implementation checklist
+   Use: Quick reference during implementation
+
+5. INDEX.md
+   Type: Markdown - Navigation Guide
+   Size: 7.0 KB (212 lines)
+   Purpose: Document index and navigation
+   Contents:
+     - Document relationships
+     - Implementation path
+     - Usage recommendations
+     - Version history
+   Use: Navigate between documents
+
+6. MANIFEST.txt
+   Type: Text - This File
+   Purpose: List all deliverables
+   Contents: You are reading it
+
+SUMMARY STATISTICS
+==================
+Total Files: 6
+Total Size: 40 KB
+Total Lines: 1,015
+Documentation Type: Markdown (5 files) + JSON (1 file)
+
+TEST COVERAGE
+=============
+Total Tests: 21
+  Supported: 18 (100% passing)
+  Unsupported: 3 (documented)
+  Failing: 0
+
+By Category:
+  Basic Operations: 6/6 passing
+  Chained Operations: 3/3 passing
+  Operator Precedence: 7/7 passing
+  Complex Expressions: 2/2 passing
+  Unsupported: 3/3 documented
+
+CONTENTS VERIFICATION
+====================
+✓ PHASE_0_IO_CONTRACT.md: Complete specification
+✓ VERIFICATION_REPORT.md: Detailed test results
+✓ TEST_DATA.json: Machine-readable test data
+✓ README.md: Quick reference guide
+✓ INDEX.md: Navigation guide
+✓ MANIFEST.txt: This manifest
+
+QUALITY ASSURANCE
+=================
+✓ All tests executed against Python implementation
+✓ 100% success rate for supported features
+✓ Exact output matching (no discrepancies)
+✓ Comprehensive documentation provided
+✓ Professional quality formatting
+✓ Multiple document formats (Markdown, JSON, Text)
+✓ Navigation and usage instructions included
+✓ Implementation checklist provided
+✓ Migration guidance documented
+
+USAGE INSTRUCTIONS
+==================
+
+For Implementers:
+1. Start with PHASE_0_IO_CONTRACT.md
+2. Review operator precedence and output format
+3. Implement in target language
+4. Run all 18 supported tests
+5. Compare outputs with TEST_DATA.json
+6. Generate verification report
+
+For Testers:
+1. Use TEST_DATA.json for test automation
+2. Import JSON data into test framework
+3. Run each test case
+4. Compare expected_output with actual_output
+5. Generate summary report
+
+For Project Managers:
+1. Read IO_CONTRACT_SUMMARY.md for overview
+2. Review README.md for quick reference
+3. Check VERIFICATION_REPORT.md for evidence
+4. Track implementation progress by test
+
+DOCUMENT RELATIONSHIPS
+======================
+PHASE_0_IO_CONTRACT.md (Specification)
+    |
+    +-- Defines all test cases and requirements
+    |
+VERIFICATION_REPORT.md (Evidence)
+    |
+    +-- Proves specification is working
+    |
+TEST_DATA.json (Data)
+    |
+    +-- Provides structured test data
+    |
+README.md + INDEX.md (Navigation)
+    |
+    +-- Helps users navigate all documents
+
+IMPLEMENTATION CHECKLIST
+=======================
+Before Implementation:
+  [ ] Read PHASE_0_IO_CONTRACT.md completely
+  [ ] Understand operator precedence
+  [ ] Review parenthesization rules
+  [ ] Study test examples
+
+During Implementation:
+  [ ] Implement lexer for +, -, *, /
+  [ ] Implement RPN stack-based parser
+  [ ] Implement LaTeX symbol mapping
+  [ ] Implement precedence-based parentheses
+  [ ] Implement output formatting
+
+After Implementation:
+  [ ] Run all 18 supported tests
+  [ ] Verify exact output match
+  [ ] Run tests by category
+  [ ] Generate verification report
+  [ ] Document any deviations
+
+SPECIFICATION SUMMARY
+====================
+Operators: 4 (+ - * /)
+Precedence Levels: 2 (low: +/-, high: */)
+Associativity: Left (all operators)
+Output Format: $<expression>$ in LaTeX math mode
+Spacing: Single space around operators
+Parentheses: ( expr ) with spaces
+
+OPERATOR REFERENCE
+==================
++  Addition        Precedence 1
+-  Subtraction     Precedence 1
+*  Multiplication  Precedence 2 (LaTeX: \times)
+/  Division        Precedence 2 (LaTeX: \div)
+
+PHASE SCOPE
+===========
+Phase 0 (Complete):
+  - Basic operators: + - * /
+  - Floating-point support
+  - Complex expressions
+  - 18 test cases
+
+Phase 1 (Documented, Not Implemented):
+  - Exponent operator (^)
+  - 3 test cases reserved
+  - Implementation notes provided
+
+RELATED DOCUMENTATION
+====================
+Python Implementation Source:
+  /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source/
+
+Verification Script:
+  /Users/jfreeman/Coding/rpn2tex-rust-migration/verify_io_contract_extended.py
+
+Summary Document:
+  /Users/jfreeman/Coding/rpn2tex-rust-migration/IO_CONTRACT_SUMMARY.md
+
+SUPPORT
+=======
+For questions about this I/O contract:
+
+1. Quick Answers
+   → Check README.md quick reference section
+
+2. Detailed Specifications
+   → Read PHASE_0_IO_CONTRACT.md completely
+
+3. Test Implementation Details
+   → Review VERIFICATION_REPORT.md
+
+4. Test Data Structure
+   → Import and review TEST_DATA.json
+
+5. Document Navigation
+   → Follow instructions in INDEX.md
+
+VERSION INFORMATION
+===================
+I/O Contract Version: 1.0
+Python Implementation: rpn2tex
+Verification Date: 2025-12-30
+Status: Complete and Verified
+
+This contract is ready for production use in validating language migrations
+of the rpn2tex implementation.
+
+================================================================================
+END OF MANIFEST
+================================================================================

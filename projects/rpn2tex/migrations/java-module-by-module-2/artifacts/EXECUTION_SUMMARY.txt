@@ -1,0 +1,242 @@
+RPN2TEX I/O CONTRACT GENERATION - EXECUTION SUMMARY
+====================================================
+
+Date: 2025-12-29
+Source Implementation: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source
+Target Contract Locations:
+  - Markdown: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/artifacts/PHASE_0_IO_CONTRACT.md
+  - Text: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/io_contract.txt
+
+EXECUTION METHODOLOGY
+====================
+
+1. Source Code Analysis
+   - Examined Python entry point: cli.py
+   - Identified processing pipeline:
+     * Lexer (rpn2tex.lexer) - Tokenization
+     * Parser (rpn2tex.parser) - AST construction
+     * LaTeXGenerator (rpn2tex.latex_gen) - Output generation
+
+2. Direct API Testing
+   - Used Python API directly to avoid CLI overhead
+   - Imported modules: Lexer, Parser, LaTeXGenerator
+   - Executed each test case through complete pipeline
+   - Captured stdout and stderr separately
+
+3. Test Case Execution
+   - Total test cases: 21
+   - Execution method: Python subprocess with inline execution
+   - Test cases sourced from: User requirements
+
+RESULTS SUMMARY
+===============
+
+Total Test Cases: 21
+Status Distribution:
+  - Successful (LaTeX output generated): 18 tests (85.7%)
+  - Error cases (expected): 3 tests (14.3%)
+  
+Error Pattern Analysis:
+  - All 3 errors occur due to unsupported '^' (exponentiation) operator
+  - Error type: LexerError (lexical analysis stage)
+  - Error message pattern: "Line <line>, column <column>: Unexpected character '^'"
+  - Affected tests: 5, 16, 17
+
+OPERATOR SUPPORT MATRIX
+=======================
+
+Supported Operators:
+  + (Addition)
+    - LaTeX representation: " + "
+    - Precedence: LOW (2)
+    - Associativity: Left
+    - Test cases: 1, 6, 11, 12, 19
+  
+  - (Subtraction)
+    - LaTeX representation: " - "
+    - Precedence: LOW (2)
+    - Associativity: Left
+    - Test cases: 2, 9
+  
+  * (Multiplication)
+    - LaTeX representation: " \times "
+    - Precedence: HIGH (1)
+    - Associativity: Left
+    - Test cases: 3, 6, 7, 8, 13, 14, 15, 18, 20, 21
+  
+  / (Division)
+    - LaTeX representation: " \div "
+    - Precedence: HIGH (1)
+    - Associativity: Left
+    - Test cases: 4, 8, 10, 21
+
+Unsupported Operators:
+  ^ (Exponentiation)
+    - Status: NOT SUPPORTED
+    - Error: LexerError at lexical analysis stage
+    - Test cases affected: 5, 16, 17
+
+PRECEDENCE AND PARENTHESIZATION RULES
+======================================
+
+Rule 1: Multiplication and Division Higher Precedence
+  - When mult/div appears with add/sub, parentheses added around add/sub
+  - Example: "5 3 +" becomes "( 5 + 3 )" when used with multiplication
+  - Test cases: 6, 13, 14, 20, 21
+
+Rule 2: Same Precedence, No Parentheses
+  - When operators have same precedence, left-to-right rendering
+  - Example: "10 2 / 5 *" becomes "10 \div 2 \times 5"
+  - Test cases: 8, 10
+
+Rule 3: Lower Precedence Context
+  - Add/sub at top level with mult/div subexpressions: no parentheses
+  - Example: "5 3 * 2 +" becomes "5 \times 3 + 2"
+  - Test cases: 7, 15
+
+FLOATING POINT SUPPORT
+=======================
+
+All floating-point numbers are preserved exactly as input:
+  - "3.14 2 *" -> "$3.14 \times 2$"
+  - "1.5 0.5 +" -> "$1.5 + 0.5$"
+
+No rounding or precision conversion occurs during processing.
+
+OUTPUT FORMAT SPECIFICATION
+============================
+
+LaTeX Math Mode:
+  - All outputs wrapped with: $ ... $
+  - Example: "$5 + 3$"
+
+Operator Spacing:
+  - All binary operators have space on both sides
+  - Example: "$5 + 3$" (not "$5+3$")
+
+Parentheses Format:
+  - Opening paren: "( "
+  - Closing paren: " )"
+  - Example: "$( 5 + 3 ) \times 2$"
+
+Number Representation:
+  - Integers: exact as input
+  - Floats: exact as input (preserves decimal point and digits)
+
+VALIDATION CRITERIA FOR MIGRATIONS
+===================================
+
+Any Java/Go/Rust migration MUST match this contract exactly:
+
+1. Output Format
+   - Must produce LaTeX math mode: $ ... $
+   - Must use correct operator symbols: +, -, \times, \div
+   - Must maintain spacing rules
+
+2. Operator Support
+   - MUST support: +, -, *, /
+   - MUST NOT support: ^
+   - Must produce LexerError for ^ character
+
+3. Precedence Rules
+   - Mult/div higher precedence than add/sub
+   - Must parenthesize appropriately
+   - All operators left-associative
+
+4. Number Support
+   - Must preserve integers exactly
+   - Must preserve floating-point numbers exactly
+   - Must not evaluate or simplify expressions
+
+5. Error Handling
+   - Must reject ^ with LexerError
+   - Must report line and column numbers correctly
+   - Must not output LaTeX when error occurs
+
+IMPLEMENTATION NOTES
+====================
+
+Python Implementation Structure:
+  - Lexer: Converts input string to Token stream
+  - Parser: Converts Token stream to AST (expression tree)
+  - Generator: Converts AST to LaTeX string
+
+Processing Flow:
+  INPUT (RPN string)
+    |
+    v
+  LEXER (tokenization)
+    |
+    v
+  PARSER (AST construction)
+    |
+    v
+  GENERATOR (LaTeX output)
+    |
+    v
+  OUTPUT (LaTeX string or ERROR)
+
+Error Points:
+  - Lexer: Unexpected characters (e.g., '^')
+  - Parser: Malformed RPN expressions
+  - Generator: No errors expected at this stage
+
+CRITICAL BEHAVIORS TO REPLICATE
+================================
+
+1. Exact Operator Symbols
+   Must use exactly: \times (not \cdot, *, x, or similar)
+   Must use exactly: \div (not /, ÷, or similar)
+
+2. Parenthesization Logic
+   - Must implement same precedence rules
+   - Must not over-parenthesize
+   - Must not under-parenthesize
+
+3. Error Message Format
+   Line/column reporting must match: "Line <N>, column <N>: <message>"
+
+4. Floating Point Handling
+   Must preserve all significant digits and decimal representation
+
+5. Output Whitespace
+   Must include space around all operators
+   Must include space after opening paren and before closing paren
+
+FILES CREATED
+=============
+
+1. PHASE_0_IO_CONTRACT.md
+   - Markdown format for human readability
+   - Includes detailed test case table
+   - Documents operator support and precedence rules
+   - Location: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/artifacts/PHASE_0_IO_CONTRACT.md
+
+2. io_contract.txt
+   - Structured text format for machine parsing
+   - Lists all 21 test cases with status
+   - Includes category classification
+   - Location: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/io_contract.txt
+
+3. EXECUTION_SUMMARY.txt (this file)
+   - Detailed execution methodology
+   - Implementation details and design patterns
+   - Validation criteria for migrations
+   - Location: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/artifacts/EXECUTION_SUMMARY.txt
+
+NEXT STEPS
+==========
+
+Use these contracts to validate Java/Go/Rust migrations:
+
+1. Run migration implementation against same test cases
+2. Compare outputs byte-for-byte with expected values
+3. Verify error cases produce identical error messages
+4. Validate parenthesization matches exactly
+5. Confirm floating-point preservation
+
+Any deviation requires investigation and potential fix in migration.
+
+====================================================
+End of Execution Summary
+====================================================

@@ -1,0 +1,368 @@
+================================================================================
+I/O CONTRACT MANIFEST - RPN2TEX MIGRATION
+================================================================================
+
+Generation Date: 2025-12-29
+Contract Version: 1.0
+Status: COMPLETE AND READY FOR USE
+
+Base Directory:
+  /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/migrations/java-module-by-module-2/
+
+Python Reference Implementation:
+  /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source
+
+================================================================================
+ARTIFACTS MANIFEST
+================================================================================
+
+Total Files: 6
+Total Size: ~30 KB
+Format: Mix of Markdown and structured text
+
+FILE LISTING:
+================================================================================
+
+1. INDEX.md
+   Location: artifacts/INDEX.md
+   Type: Markdown navigation guide
+   Size: 3.6 KB
+   Lines: ~130
+   Purpose: Navigation index to all contract files
+   Content:
+     - Quick navigation links
+     - File descriptions
+     - Usage guide
+     - Key specifications overview
+
+2. README.md
+   Location: artifacts/README.md
+   Type: Markdown master guide
+   Size: 8.6 KB
+   Lines: ~350+
+   Purpose: Complete master guide to contracts
+   Content:
+     - Overview and file descriptions
+     - Usage instructions for Java/Go/Rust
+     - Complete specifications
+     - Validation checklist
+     - Common pitfalls
+     - FAQs
+
+3. PHASE_0_IO_CONTRACT.md (PRIMARY SPECIFICATION)
+   Location: artifacts/PHASE_0_IO_CONTRACT.md
+   Type: Markdown specification
+   Size: 4.0 KB
+   Lines: ~90
+   Purpose: Main I/O contract specification
+   Content:
+     - Test case table (all 21 tests)
+     - Error cases documentation
+     - Operator mapping
+     - Parentheses rules
+     - Implementation details
+     - Behavioral notes
+
+4. QUICK_REFERENCE.md
+   Location: artifacts/QUICK_REFERENCE.md
+   Type: Markdown quick reference
+   Size: 2.9 KB
+   Lines: ~81
+   Purpose: Quick lookup guide
+   Content:
+     - Test results summary
+     - All test cases in condensed table
+     - Operator reference
+     - Parenthesization rules with examples
+     - Error format
+     - Implementation notes
+     - Critical points for migrations
+
+5. EXECUTION_SUMMARY.txt
+   Location: artifacts/EXECUTION_SUMMARY.txt
+   Type: Plain text technical documentation
+   Size: 7.2 KB
+   Lines: ~242
+   Purpose: Technical methodology and implementation details
+   Content:
+     - Execution methodology
+     - Results summary
+     - Operator support matrix
+     - Precedence and parenthesization rules
+     - Floating-point handling
+     - Output format specification
+     - Validation criteria
+     - Implementation notes
+     - Critical behaviors to replicate
+
+6. io_contract.txt (MACHINE-READABLE)
+   Location: io_contract.txt (parent directory)
+   Type: Structured plain text
+   Size: 4.1 KB
+   Lines: ~178
+   Purpose: Machine-readable test case data
+   Content:
+     - 21 individual test case entries
+     - Input/output pairs
+     - Status and category for each test
+     - Summary statistics
+     - Operator support matrices
+     - Notes and behavioral details
+
+================================================================================
+COMPLETE TEST CASE COVERAGE
+================================================================================
+
+Total Test Cases Executed: 21
+
+Passing Tests (18):
+  1. 5 3 + → $5 + 3$
+  2. 5 3 - → $5 - 3$
+  3. 4 7 * → $4 \times 7$
+  4. 10 2 / → $10 \div 2$
+  6. 5 3 + 2 * → $( 5 + 3 ) \times 2$
+  7. 5 3 * 2 + → $5 \times 3 + 2$
+  8. 10 2 / 5 * → $10 \div 2 \times 5$
+  9. 5 3 - 2 - → $5 - 3 - 2$
+  10. 100 10 / 5 / 2 / → $100 \div 10 \div 5 \div 2$
+  11. 1 2 + 3 + 4 + → $1 + 2 + 3 + 4$
+  12. 2 3 4 * + → $2 + 3 \times 4$
+  13. 2 3 + 4 * → $( 2 + 3 ) \times 4$
+  14. 2 3 4 + * → $2 \times ( 3 + 4 )$
+  15. 2 3 * 4 + → $2 \times 3 + 4$
+  18. 3.14 2 * → $3.14 \times 2$
+  19. 1.5 0.5 + → $1.5 + 0.5$
+  20. 1 2 + 3 4 + * → $( 1 + 2 ) \times ( 3 + 4 )$
+  21. 10 2 / 3 + 4 * → $( 10 \div 2 + 3 ) \times 4$
+
+Error Tests (3 - Expected):
+  5. 2 3 ^ → LexerError: Line 1, column 5: Unexpected character '^'
+  16. 2 3 ^ 4 * → LexerError: Line 1, column 5: Unexpected character '^'
+  17. 2 3 4 ^ ^ → LexerError: Line 1, column 7: Unexpected character '^'
+
+================================================================================
+KEY SPECIFICATIONS SUMMARY
+================================================================================
+
+Supported Operators (4):
+  + Addition          → " + "       Precedence: Low    Associativity: Left
+  - Subtraction       → " - "       Precedence: Low    Associativity: Left
+  * Multiplication    → " \times "  Precedence: High   Associativity: Left
+  / Division          → " \div "    Precedence: High   Associativity: Left
+
+Unsupported Operators (1):
+  ^ Exponentiation - Must reject with LexerError
+
+Output Format:
+  - Math mode delimiters: $ ... $
+  - Operator spacing: space before and after
+  - Parentheses: ( before, ) after, with internal spaces
+  - Number format: preserved exactly as input
+
+Precedence Levels:
+  High (1): * /
+  Low (2): + -
+
+Parenthesization Rules:
+  1. Add parentheses when lower precedence operation is operand of higher precedence
+  2. No parentheses for same precedence (left-to-right reading)
+  3. No unnecessary parentheses
+
+Error Format:
+  Line <N>, column <N>: Unexpected character '<char>'
+
+================================================================================
+IMPLEMENTATION PIPELINE
+================================================================================
+
+Stage 1: Lexer (Tokenization)
+  Input: String with tokens
+  Output: Token stream
+  Actions: Break into tokens, reject unsupported characters (^)
+  Errors: LexerError for ^ character
+
+Stage 2: Parser (AST Construction)
+  Input: Token stream
+  Output: Expression tree (AST)
+  Actions: Build tree from RPN tokens, validate structure
+  Errors: ParserError for malformed RPN
+
+Stage 3: Generator (LaTeX Output)
+  Input: Expression tree (AST)
+  Output: LaTeX string
+  Actions: Traverse tree, apply precedence rules, generate LaTeX
+  Errors: None expected at this stage
+
+================================================================================
+VALIDATION CHECKLIST
+================================================================================
+
+Before deployment, verify:
+
+Output Format:
+  [ ] All outputs wrapped in $ ... $
+  [ ] Spaces around all operators
+  [ ] Parentheses format with spaces: ( and )
+
+Operator Support:
+  [ ] Addition (+) works
+  [ ] Subtraction (-) works
+  [ ] Multiplication (*) → \times
+  [ ] Division (/) → \div
+  [ ] Exponentiation (^) → LexerError
+
+Number Handling:
+  [ ] Integers exact
+  [ ] Floats preserved digit-for-digit
+  [ ] No evaluation/simplification
+
+Precedence:
+  [ ] Mult/div > add/sub
+  [ ] Left-associativity
+  [ ] Correct parenthesization
+  [ ] No over-parenthesization
+  [ ] No under-parenthesization
+
+Error Handling:
+  [ ] ^ produces LexerError
+  [ ] Format: Line <N>, column <N>: Unexpected character '^'
+  [ ] Line/column correct
+
+Results:
+  [ ] All 18 passing tests exact match
+  [ ] All 3 error tests exact match
+
+================================================================================
+HOW TO USE THIS CONTRACT
+================================================================================
+
+FOR IMPLEMENTATION:
+  1. Start with: artifacts/README.md (master guide)
+  2. Reference: artifacts/PHASE_0_IO_CONTRACT.md (main spec)
+  3. Lookup: artifacts/QUICK_REFERENCE.md (quick rules)
+  4. Details: artifacts/EXECUTION_SUMMARY.txt (technical)
+
+FOR TESTING:
+  1. Test data: io_contract.txt (machine-readable)
+  2. Expected output: Any of the contract files
+  3. Validation: Use README.md checklist
+  4. Reference: QUICK_REFERENCE.md for rules
+
+FOR NAVIGATION:
+  1. What files exist: INDEX.md
+  2. Which file to use: INDEX.md quick navigation
+  3. Complete overview: README.md
+
+FOR AUTOMATION:
+  1. Parse test cases: io_contract.txt
+  2. Get specifications: EXECUTION_SUMMARY.txt
+  3. Reference implementation: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source
+
+================================================================================
+WHAT'S COVERED
+================================================================================
+
+Test Coverage:
+  ✓ Basic arithmetic (4 tests)
+  ✓ Complex precedence handling (10 tests)
+  ✓ Floating-point numbers (2 tests)
+  ✓ Error cases (3 tests)
+  ✓ Edge cases and special behaviors
+
+Operator Coverage:
+  ✓ All supported operators: +, -, *, /
+  ✓ Unsupported operator: ^
+  ✓ Precedence rules
+  ✓ Output format for each
+
+Documentation Coverage:
+  ✓ Complete specification
+  ✓ Implementation guidance
+  ✓ Architecture documentation
+  ✓ Validation criteria
+  ✓ Common pitfalls
+  ✓ Quick reference guides
+  ✓ Technical details
+
+Format Coverage:
+  ✓ Human-readable (Markdown)
+  ✓ Machine-readable (text)
+  ✓ Quick reference
+  ✓ Technical documentation
+  ✓ Navigation guides
+
+================================================================================
+NEXT STEPS FOR MIGRATIONS
+================================================================================
+
+Step 1: UNDERSTANDING (Read in order)
+  [ ] INDEX.md - understand file structure
+  [ ] README.md - understand complete picture
+  [ ] QUICK_REFERENCE.md - understand key rules
+
+Step 2: IMPLEMENTATION (Reference while coding)
+  [ ] PHASE_0_IO_CONTRACT.md - main specification
+  [ ] QUICK_REFERENCE.md - quick lookups
+  [ ] EXECUTION_SUMMARY.txt - detailed rules
+
+Step 3: TESTING (Validate against contract)
+  [ ] io_contract.txt - test case data
+  [ ] README.md checklist - validation items
+  [ ] QUICK_REFERENCE.md - expected outputs
+
+Step 4: VERIFICATION (Ensure completeness)
+  [ ] All 18 tests pass
+  [ ] All 3 errors correct
+  [ ] All validation items checked
+  [ ] Ready for merge
+
+================================================================================
+SUPPORT RESOURCES
+================================================================================
+
+Getting Help:
+  1. Navigation: See INDEX.md for file purposes
+  2. Specifications: See PHASE_0_IO_CONTRACT.md for rules
+  3. Quick answers: See QUICK_REFERENCE.md
+  4. Technical details: See EXECUTION_SUMMARY.txt
+  5. Master guide: See README.md
+
+Reference Implementation:
+  Location: /Users/jfreeman/Coding/rpn2tex-rust-migration/projects/rpn2tex/source
+  Language: Python
+  Can be used to verify behavior during implementation
+
+Contact Points:
+  - All documentation is in this directory
+  - No external dependencies or resources needed
+  - Complete specification self-contained
+
+================================================================================
+CONTRACT STATUS AND METADATA
+================================================================================
+
+Status: COMPLETE
+Version: 1.0
+Date Created: 2025-12-29
+Date Last Updated: 2025-12-29
+Generated By: I/O Contract Generator Agent
+
+Quality Metrics:
+  - All 21 test cases executed: YES
+  - Outputs captured exactly: YES
+  - Errors documented: YES
+  - Multiple formats provided: YES
+  - Complete documentation: YES
+  - Ready for deployment: YES
+
+Verification:
+  - Source implementation runs: VERIFIED
+  - All test cases execute: VERIFIED
+  - Outputs are exact: VERIFIED
+  - Errors documented correctly: VERIFIED
+  - Documentation complete: VERIFIED
+
+================================================================================
+                            END OF MANIFEST
+================================================================================
+

@@ -1,0 +1,130 @@
+{
+  "identity": {
+    "run_id": "87b1c6c1-fd71-4a1f-929b-99790bb15b6e",
+    "project_name": "rpn2tex",
+    "source_language": "python",
+    "target_language": "go",
+    "strategy": "feature-by-feature",
+    "started_at": "2025-12-30T13:24:54.542592",
+    "completed_at": "2025-12-30T13:58:02.903739",
+    "host_platform": null,
+    "sdk_version": null,
+    "model_id": null
+  },
+  "timing": {
+    "wall_clock_duration_ms": 1986570,
+    "api_duration_ms": 2334470,
+    "phase_durations_ms": {
+      "setup": 1,
+      "migration": 1987646
+    },
+    "module_durations": []
+  },
+  "cost": {
+    "total_cost_usd": 6.304124750000002,
+    "input_tokens_cost_usd": 0.0,
+    "output_tokens_cost_usd": 0.0,
+    "cache_creation_cost_usd": 0.0
+  },
+  "tokens": {
+    "input_tokens": 781,
+    "output_tokens": 24359,
+    "cache_creation_input_tokens": 39362,
+    "cache_read_input_tokens": 1088015,
+    "cache_efficiency_ratio": 0.9992826939114398
+  },
+  "agent": {
+    "total_turns": 38,
+    "total_messages": 923,
+    "subagent_invocations": {
+      "io_contract": 1,
+      "analyst": 1,
+      "migrator": 6,
+      "reviewer": 6
+    },
+    "tool_invocations": {
+      "TodoWrite": 12,
+      "Task": 14,
+      "Bash": 179,
+      "Read": 153,
+      "Write": 24,
+      "Glob": 22,
+      "Edit": 39
+    },
+    "error_recovery_events": 0,
+    "retry_count": 0
+  },
+  "source_metrics": {
+    "production_loc": 0,
+    "test_loc": 0,
+    "total_loc": 0,
+    "module_count": 0,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "target_metrics": {
+    "production_loc": 388,
+    "test_loc": 1002,
+    "total_loc": 1390,
+    "module_count": 7,
+    "function_count": 0,
+    "avg_cyclomatic_complexity": 0.0,
+    "max_cyclomatic_complexity": 0,
+    "external_dependencies": 0,
+    "maintainability_index": null
+  },
+  "quality_gates": {
+    "compilation": {
+      "passed": false,
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "linting": {
+      "passed": false,
+      "tool": "",
+      "error_count": 0,
+      "warning_count": 0
+    },
+    "formatting": {
+      "passed": false,
+      "tool": ""
+    },
+    "unit_tests": {
+      "passed": false,
+      "total": 0,
+      "passed_count": 0,
+      "failed_count": 0,
+      "skipped_count": 0
+    },
+    "coverage": {
+      "line_coverage_pct": 27.0,
+      "function_coverage_pct": null,
+      "branch_coverage_pct": null
+    },
+    "idiomaticness": {
+      "score": null,
+      "reasoning": null
+    }
+  },
+  "io_contract": {
+    "total_test_cases": 21,
+    "passed": 21,
+    "failed": 0,
+    "unsupported": 0,
+    "feature_results": [],
+    "match_rate_pct": 100.0
+  },
+  "outcome": {
+    "status": "success",
+    "modules_completed": 0,
+    "modules_total": 0,
+    "blocking_issues": [],
+    "notes": null
+  },
+  "schema_version": "1.0.0",
+  "loc_expansion_ratio": 0.0,
+  "cost_per_loc": 0.0
+}

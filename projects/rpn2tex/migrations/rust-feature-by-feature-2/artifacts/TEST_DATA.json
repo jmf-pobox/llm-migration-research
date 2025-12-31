@@ -1,0 +1,234 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "implementation": "Python rpn2tex",
+    "verification_date": "2025-12-30",
+    "total_tests": 21,
+    "passed": 18,
+    "failed": 0,
+    "unsupported": 3
+  },
+  "test_cases": [
+    {
+      "id": 1,
+      "category": "Basic Operations",
+      "input": "5 3 +",
+      "expected_output": "$5 + 3$",
+      "actual_output": "$5 + 3$",
+      "status": "PASS",
+      "notes": "Basic binary addition"
+    },
+    {
+      "id": 2,
+      "category": "Basic Operations",
+      "input": "5 3 -",
+      "expected_output": "$5 - 3$",
+      "actual_output": "$5 - 3$",
+      "status": "PASS",
+      "notes": "Basic binary subtraction"
+    },
+    {
+      "id": 3,
+      "category": "Basic Operations",
+      "input": "4 7 *",
+      "expected_output": "$4 \\times 7$",
+      "actual_output": "$4 \\times 7$",
+      "status": "PASS",
+      "notes": "Basic multiplication with LaTeX times symbol"
+    },
+    {
+      "id": 4,
+      "category": "Basic Operations",
+      "input": "10 2 /",
+      "expected_output": "$10 \\div 2$",
+      "actual_output": "$10 \\div 2$",
+      "status": "PASS",
+      "notes": "Basic division with LaTeX div symbol"
+    },
+    {
+      "id": 5,
+      "category": "Basic Operations",
+      "input": "3.14 2 *",
+      "expected_output": "$3.14 \\times 2$",
+      "actual_output": "$3.14 \\times 2$",
+      "status": "PASS",
+      "notes": "Floating-point operands"
+    },
+    {
+      "id": 6,
+      "category": "Basic Operations",
+      "input": "1.5 0.5 +",
+      "expected_output": "$1.5 + 0.5$",
+      "actual_output": "$1.5 + 0.5$",
+      "status": "PASS",
+      "notes": "Floating-point addition"
+    },
+    {
+      "id": 7,
+      "category": "Chained Operations",
+      "input": "1 2 + 3 + 4 +",
+      "expected_output": "$1 + 2 + 3 + 4$",
+      "actual_output": "$1 + 2 + 3 + 4$",
+      "status": "PASS",
+      "notes": "Multiple additions (left-associative)"
+    },
+    {
+      "id": 8,
+      "category": "Chained Operations",
+      "input": "5 3 - 2 -",
+      "expected_output": "$5 - 3 - 2$",
+      "actual_output": "$5 - 3 - 2$",
+      "status": "PASS",
+      "notes": "Multiple subtractions: 5 - 3 - 2 = -1 (left-associative)"
+    },
+    {
+      "id": 9,
+      "category": "Chained Operations",
+      "input": "100 10 / 5 / 2 /",
+      "expected_output": "$100 \\div 10 \\div 5 \\div 2$",
+      "actual_output": "$100 \\div 10 \\div 5 \\div 2$",
+      "status": "PASS",
+      "notes": "Multiple divisions (left-associative)"
+    },
+    {
+      "id": 10,
+      "category": "Operator Precedence",
+      "input": "5 3 + 2 *",
+      "expected_output": "$( 5 + 3 ) \\times 2$",
+      "actual_output": "$( 5 + 3 ) \\times 2$",
+      "status": "PASS",
+      "notes": "Addition lower than multiplication - needs parentheses"
+    },
+    {
+      "id": 11,
+      "category": "Operator Precedence",
+      "input": "2 3 + 4 *",
+      "expected_output": "$( 2 + 3 ) \\times 4$",
+      "actual_output": "$( 2 + 3 ) \\times 4$",
+      "status": "PASS",
+      "notes": "Addition lower than multiplication - needs parentheses"
+    },
+    {
+      "id": 12,
+      "category": "Operator Precedence",
+      "input": "2 3 4 + *",
+      "expected_output": "$2 \\times ( 3 + 4 )$",
+      "actual_output": "$2 \\times ( 3 + 4 )$",
+      "status": "PASS",
+      "notes": "Addition on right side - needs parentheses"
+    },
+    {
+      "id": 13,
+      "category": "Operator Precedence",
+      "input": "2 3 4 * +",
+      "expected_output": "$2 + 3 \\times 4$",
+      "actual_output": "$2 + 3 \\times 4$",
+      "status": "PASS",
+      "notes": "Multiplication higher than addition - no parentheses needed"
+    },
+    {
+      "id": 14,
+      "category": "Operator Precedence",
+      "input": "2 3 * 4 +",
+      "expected_output": "$2 \\times 3 + 4$",
+      "actual_output": "$2 \\times 3 + 4$",
+      "status": "PASS",
+      "notes": "Multiplication higher than addition - no parentheses needed"
+    },
+    {
+      "id": 15,
+      "category": "Operator Precedence",
+      "input": "5 3 * 2 +",
+      "expected_output": "$5 \\times 3 + 2$",
+      "actual_output": "$5 \\times 3 + 2$",
+      "status": "PASS",
+      "notes": "Multiplication higher than addition - no parentheses needed"
+    },
+    {
+      "id": 16,
+      "category": "Operator Precedence",
+      "input": "10 2 / 5 *",
+      "expected_output": "$10 \\div 2 \\times 5$",
+      "actual_output": "$10 \\div 2 \\times 5$",
+      "status": "PASS",
+      "notes": "Division and multiplication same precedence - no parens"
+    },
+    {
+      "id": 17,
+      "category": "Complex Expressions",
+      "input": "1 2 + 3 4 + *",
+      "expected_output": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "actual_output": "$( 1 + 2 ) \\times ( 3 + 4 )$",
+      "status": "PASS",
+      "notes": "Product of two sums"
+    },
+    {
+      "id": 18,
+      "category": "Complex Expressions",
+      "input": "10 2 / 3 + 4 *",
+      "expected_output": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "actual_output": "$( 10 \\div 2 + 3 ) \\times 4$",
+      "status": "PASS",
+      "notes": "Division and addition in left operand, then multiply"
+    },
+    {
+      "id": 19,
+      "category": "Unsupported Features",
+      "input": "2 3 ^",
+      "expected_output": "UNSUPPORTED",
+      "actual_output": "ERROR",
+      "status": "UNSUPPORTED",
+      "error": "Lexer error: Unexpected character '^'"
+    },
+    {
+      "id": 20,
+      "category": "Unsupported Features",
+      "input": "2 3 ^ 4 *",
+      "expected_output": "UNSUPPORTED",
+      "actual_output": "ERROR",
+      "status": "UNSUPPORTED",
+      "error": "Lexer error: Unexpected character '^'"
+    },
+    {
+      "id": 21,
+      "category": "Unsupported Features",
+      "input": "2 3 4 ^ ^",
+      "expected_output": "UNSUPPORTED",
+      "actual_output": "ERROR",
+      "status": "UNSUPPORTED",
+      "error": "Lexer error: Unexpected character '^'"
+    }
+  ],
+  "operator_mappings": {
+    "+": {
+      "name": "Addition",
+      "precedence": 1,
+      "associativity": "left",
+      "latex_symbol": "+"
+    },
+    "-": {
+      "name": "Subtraction",
+      "precedence": 1,
+      "associativity": "left",
+      "latex_symbol": "-"
+    },
+    "*": {
+      "name": "Multiplication",
+      "precedence": 2,
+      "associativity": "left",
+      "latex_symbol": "\\times"
+    },
+    "/": {
+      "name": "Division",
+      "precedence": 2,
+      "associativity": "left",
+      "latex_symbol": "\\div"
+    }
+  },
+  "output_format_rules": {
+    "math_mode_delimiters": "$...$",
+    "spacing_around_operators": "single_space",
+    "parentheses_format": "( expr )",
+    "number_format": "preserve_as_input"
+  }
+}

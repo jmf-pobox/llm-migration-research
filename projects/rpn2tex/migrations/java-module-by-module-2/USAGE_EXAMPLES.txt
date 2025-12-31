@@ -1,0 +1,53 @@
+# rpn2tex CLI - Usage Examples
+
+## Build and Test
+./gradlew build test
+
+## Run from command line
+
+### Using compiled classes
+echo "5 3 +" | java -cp build/classes/java/main com.rpn2tex.Main -
+
+### Using Gradle run
+./gradlew -q run --args="/path/to/input.rpn"
+
+## Example Commands
+
+### Read from stdin, write to stdout
+echo "5 3 +" | java -cp build/classes/java/main com.rpn2tex.Main -
+# Output: $5 + 3$
+
+### Read from file, write to stdout
+java -cp build/classes/java/main com.rpn2tex.Main input.rpn
+
+### Read from file, write to file
+java -cp build/classes/java/main com.rpn2tex.Main input.rpn -o output.tex
+
+### Show help
+java -cp build/classes/java/main com.rpn2tex.Main --help
+
+## Example Inputs
+
+### Basic operations
+5 3 +          → $5 + 3$
+5 3 -          → $5 - 3$
+4 7 *          → $4 \times 7$
+10 2 /         → $10 \div 2$
+
+### Complex operations with precedence
+5 3 + 2 *      → $( 5 + 3 ) \times 2$
+5 3 * 2 +      → $5 \times 3 + 2$
+2 3 4 + *      → $2 \times ( 3 + 4 )$
+
+### Floating point
+3.14 2 *       → $3.14 \times 2$
+1.5 0.5 +      → $1.5 + 0.5$
+
+### Error cases
+2 3 ^          → ERROR: Unexpected character '^'
+5 +            → ERROR: Operator '+' requires two operands
+5 3            → ERROR: Invalid RPN: 2 values remain on stack
+
+## Test Coverage
+./gradlew test jacocoTestReport
+# Report: build/reports/jacoco/test/html/index.html
