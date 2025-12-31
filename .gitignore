@@ -7,6 +7,11 @@ __pycache__/
 .eggs/
 .venv/
 venv/
+.coverage
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 # Rust
 target/
@@ -17,8 +22,17 @@ Cargo.lock
 build/
 *.class
 
+# Go
+go.sum
+
 # Database
 migrations.db
+*.sqlite
+
+# Temporary/generated files
+batch_output.log
+batch.pid
+migrations_export.json
 
 # IDE
 .idea/

@@ -1,37 +1,39 @@
-# LLM Code Migration Research
+# Autonomous Cross-Language Code Migration via Behavioral Contracts
 
-A multi-agent LLM framework for autonomous cross-language code migration. Orchestrates Claude agents to migrate Python codebases to Rust, Java, or Go using either module-by-module or feature-by-feature strategies.
+A multi-agent LLM framework for autonomous cross-language code migration. Orchestrates Claude agents to migrate Python codebases to Rust, Java, or Go using either module-by-module or feature-by-feature strategies, validated against I/O behavioral contracts.
 
 ## What This Is
 
 This project provides infrastructure for **autonomous** code migration:
 
 - **Multi-Agent Architecture** - Specialized agents for I/O contracts, analysis, migration, and review
+- **Behavioral Contracts** - I/O contracts derived from source execution ensure behavioral equivalence
 - **Migration Strategies** - Module-by-module (vertical slices) and feature-by-feature (horizontal slices)
 - **Telemetry Collection** - Standardized metrics: timing, cost, tokens, code quality, coverage
-- **Analysis & Reporting** - Aggregation across runs, Markdown/LaTeX report generation
 
 The framework uses the [Claude Agent SDK](https://github.com/anthropics/claude-code/tree/main/sdk) for execution. Migrations run end-to-end without human intervention: agents read source code, generate target implementations, execute quality gates, and iterate on failures autonomously.
 
 ## Key Findings
 
-Migrated `rpn2tex` (Python → Rust/Java/Go, 352 LOC source) with 6 configurations:
+Migrated `rpn2tex` (Python → Rust/Java/Go, 352 LOC source) across 18 runs (3 per configuration):
 
 | Target | Strategy | Duration | Cost | Coverage | I/O Match |
 |--------|----------|----------|------|----------|-----------|
-| Rust | Module-by-module | 32 min | $8.83 | 94.7% | 100% |
-| Rust | Feature-by-feature | 60 min | $9.60 | 94.8% | 100% |
-| Java | Module-by-module | 37 min | $14.11 | 84.0% | 100% |
-| Java | Feature-by-feature | 55 min | $8.18 | 73.0% | 100% |
-| Go | Module-by-module | 37 min | $8.99 | 64.9% | 100% |
-| Go | Feature-by-feature | 56 min | $6.43 | 68.2% | 100% |
+| Rust | Module-by-module | 32 min | $8.62 | 95% | 100% |
+| Rust | Feature-by-feature | 51 min | $8.24 | 95% | 100% |
+| Java | Module-by-module | 45 min | $11.93 | 92% | 100% |
+| Java | Feature-by-feature | 47 min | $7.96 | 80% | 100% |
+| Go | Module-by-module | 49 min | $8.42 | 71% | 100% |
+| Go | Feature-by-feature | 44 min | $6.32 | 67% | 100% |
+
+*Values are means across 3 runs per configuration.*
 
 **Key observations:**
-- Module-by-module is consistently faster (32-37 min vs 55-60 min)
-- Cost varies without clear pattern by strategy ($6.43 to $14.11)
-- Coverage varies by language: Rust 94-95%, Java 73-84%, Go 65-68%
-- All migrations achieve 100% behavioral equivalence on 21-case I/O contract
-- Agents generate 2-4x more test code than production code
+- All 18 migrations achieve 100% behavioral equivalence on 21-case I/O contract
+- Coverage varies by language: Rust 95%, Java 80-92%, Go 67-71%
+- Cost ranges from $6.32 to $11.93 per migration
+- Strategy effects are language-dependent (no universal winner)
+- Agents generate 2-5x more test code than production code
 
 See [docs/research/comparative_analysis.pdf](docs/research/comparative_analysis.pdf) for the full research paper.
 
